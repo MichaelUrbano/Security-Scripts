@@ -48,6 +48,7 @@
 # net.ipv4.tcp_syncookies = 1
 
 # TODO: Basic tar backup function (/etc/, /var/www/html/, /opt/) to directory specified in env (BAKDIR), defaults to /usr/sbin/ if unspecified
+# chattr +iauA <file>
 
 # TODO: Service auditor, checking if packages/services exist on the system, and if they should be removed/disabled (2.1)
 
@@ -63,81 +64,102 @@
 
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
-# determine distro being used
-if [ -f /etc/os-release ]; then
-    # freedesktop.org and systemd
-    . /etc/os-release
-    DISTRO=$NAME
-    VER=$VERSION_ID
-elif type lsb_release > /dev/null 2>&1; then
-    # linuxbase.org
-    DISTRO=$(lsb_release -si)
-    VER=$(lsb_release -sr)
-elif [ -f /etc/lsb-release ]; then
-    # For some versions of Debian/Ubuntu without lsb_release command
-    . /etc/lsb-release
-    DISTRO=$DISTRIB_ID
-    VER=$DISTRIB_RELEASE
-elif [ -f /etc/debian_version ]; then
-    # Older Debian/Ubuntu/etc.
-    DISTRO=Debian
-    VER=$(cat /etc/debian_version)
-else
-    # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
-    DISTRO=$(uname -s)
-    VER=$(uname -r)
-fi
-echo "Distribution: $DISTRO"
-DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
+# TODO: Allow for overriding variables (DISTRO, PKG_MANAGER, FIREWALLS)
 
-# choose correct package manager for distro
-case "$DISTRO" in
-    ubuntu|debian|mint)
-        PKG_MANAGER="apt"
-        ;;
-    centos|rocky|almalinux|fedora)
-        PKG_MANAGER="yum"
-        ;;
-    arch)
-        PKG_MANAGER="pacman"
-        ;;
-    opensuse*)
-        PKG_MANAGER="zypper"
-        ;;
-    *)
-        PKG_MANAGER="unsupported"
-        ;;
-esac
-
-echo "Packge Manager: $PKG_MANAGER"
-
-# find firewalls installed on the system
-FIREWALLS=""
-
-# firewalld
-if command -v firewall-cmd >/dev/null 2>&1; then
-    FIREWALLS+="firewalld "
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root, or with sudo." >&2
+    exit 1
 fi
 
-# ufw
-if command -v ufw >/dev/null 2>&1; then
-    FIREWALLS+="ufw "
-fi
+source "$HOME/.env"
 
-# nftables
-if command -v nft >/dev/null 2>&1; then
-    FIREWALLS+="nftables "
-fi
+# Sets up variables, and checks for important system information
+init() {
+    # Set ANSI Escape Code variables for different colors in the terminal
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    MAGENTA='\033[0;35m]'
+    CYAN='\033[0;36m]'
+    NC='\033[0m'
 
-# iptables
-if command -v iptables >/dev/null 2>&1; then
-    FIREWALLS+="iptables "
-fi
+    # Determine distro being used
+    if [ -f /etc/os-release ]; then
+        # freedesktop.org and systemd
+        . /etc/os-release
+        DISTRO=$ID
+        VER=$VERSION_ID
+    elif type lsb_release > /dev/null 2>&1; then
+        # linuxbase.org
+        DISTRO=$(lsb_release -si)
+        VER=$(lsb_release -sr)
+    elif [ -f /etc/lsb-release ]; then
+        # For some versions of Debian/Ubuntu without lsb_release command
+        . /etc/lsb-release
+        DISTRO=$DISTRIB_ID
+        VER=$DISTRIB_RELEASE
+    elif [ -f /etc/debian_version ]; then
+        # Older Debian/Ubuntu/etc.
+        DISTRO=Debian
+        VER=$(cat /etc/debian_version)
+    else
+        # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
+        DISTRO=$(uname -s)
+        VER=$(uname -r)
+    fi
+    DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
+    echo -e "${GREEN}Distribution ID:${NC} $DISTRO"
 
-# Trim trailing space
-FIREWALLS="${FIREWALLS%" "}"
+    # Choose correct package manager for distro
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint)
+            PKG_MANAGER="apt"
+            ;;
+        centos|rocky|almalinux|fedora|ol)
+            PKG_MANAGER="yum"
+            ;;
+        opensuse*)
+            PKG_MANAGER="zypper"
+            ;;
+        arch)
+            PKG_MANAGER="pacman"
+            ;;
+        *)
+            PKG_MANAGER="unsupported"
+            ;;
+    esac 
 
-echo "Installed firewalls: $FIREWALLS"
+    echo -e "${GREEN}Packge Manager:${NC} $PKG_MANAGER"
+
+    # Find firewalls installed on the system
+    FIREWALLS=""
+
+    # firewalld
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        FIREWALLS+="firewalld "
+    fi
+
+    # ufw
+    if command -v ufw >/dev/null 2>&1; then
+        FIREWALLS+="ufw "
+    fi
+
+    # nftables
+    if command -v nft >/dev/null 2>&1; then
+        FIREWALLS+="nftables "
+    fi
+
+    # iptables
+    if command -v iptables >/dev/null 2>&1; then
+        FIREWALLS+="iptables "
+    fi
+
+    # Trim trailing space
+    FIREWALLS="${FIREWALLS%" "}"
+
+    echo -e "${GREEN}Installed Firewalls:${NC} ${RED}$FIREWALLS${NC}"
+}
 
 install_package() {
     local package_manager="$1"
@@ -170,13 +192,13 @@ install_package() {
             echo "Using yum to install $package_name..."
             yum install -y "$package_name"
             ;;
-        pacman)
-            echo "Using pacman to install $package_name..."
-            pacman -Syu --noconfirm "$package_name"
-            ;;
         zypper)
             echo "Using zypper to install $package_name..."
             zypper install -y "$package_name"
+            ;;
+        pacman)
+            echo "Using pacman to install $package_name..."
+            pacman -Syu --noconfirm "$package_name"
             ;;
         *)
             echo "Error: Unsupported package manager."
@@ -216,13 +238,13 @@ remove_package() {
             echo "Using yum to remove $package_name..."
             yum remove -y "$package_name"
             ;;
-        pacman)
-            echo "Using pacman to remove $package_name..."
-            pacman -R --noconfirm "$package_name"
-            ;;
         zypper)
             echo "Using zypper to remove $package_name..."
             zypper remove -y "$package_name"
+            ;;
+        pacman)
+            echo "Using pacman to remove $package_name..."
+            pacman -R --noconfirm "$package_name"
             ;;
         *)
             echo "Error: Unsupported package manager."
@@ -256,13 +278,13 @@ upgrade_system() {
             echo "Using yum to upgrade system..."
             yum upgrade -y
             ;;
-        pacman)
-            echo "Using pacman to upgrade system..."
-            pacman -Syu --noconfirm
-            ;;
         zypper)
             echo "Using zypper to upgrade system..."
             zypper up
+            ;;
+        pacman)
+            echo "Using pacman to upgrade system..."
+            pacman -Syu --noconfirm
             ;;
         *)
             echo "Error: Unsupported package manager."
@@ -283,7 +305,7 @@ install_recommended_software() {
             install_package "$PKG_MANAGER" "aide"
             ;;
         *)
-            echo "Nothing here yet, sorry."
+            echo "We don't know what your package manager is, sorry"
             ;;
     esac
 }
@@ -304,6 +326,47 @@ remove_recommended_software() {
             echo "Nothing here yet, sorry."
             ;;
     esac
+}
+
+# Basic tar backup function for /etc, /var/www/html, and /opt to directory specified in env ($BAKDIR), defaults to /usr/sbin/ if unspecified
+# Will also try to make deleting or modifying backups a little annoying
+# Will put your backups into the child directory <backup_directory>/b4
+backup_directories() {
+    local backup_directory="${BAKDIR:-/usr/sbin}"
+    if [ ! -d "$backup_directory" ]; then
+        echo -e "${RED}Backup directory does not exist${NC}"
+        return 1
+    fi
+    local backup_path="${backup_directory}/b4"
+    mkdir -p "${backup_path}"
+    chmod +t "${backup_path}"
+    local flag
+
+    if [ -d "/etc" ]; then
+        echo -e "Backing up ${YELLOW}/etc${NC}"
+        local etc_backup="${backup_path}/ettc-$(date +%b-%d-%H.%M.%S)"
+        tar -cf "$etc_backup" /etc
+        for flag in i a u A; do
+            chattr "$flag" "$etc_backup" >/dev/null 2>&1 || true
+        done
+    fi
+    if [ -d "/var/www/html" ]; then
+        echo -e "Backing up ${YELLOW}/var/www/html${NC}"
+        local html_backup="${backup_path}/httml-$(date +%b-%d-%H.%M.%S)"
+        tar -cf "$html_backup" /var/www/html >/dev/null 2>&1 || true
+        for flag in i a u A; do
+            chattr "$flag" "$html_backup" >/dev/null 2>&1 || true
+        done
+    fi
+    if [ -d "/opt" ]; then
+        echo -e "Backing up ${YELLOW}/opt${NC}"
+        local opt_backup="${backup_path}/oppt-$(date +%b-%d-%H.%M.%S)"
+        tar -cf "$opt_backup" /opt >/dev/null 2>&1 || true
+        for flag in i a u A; do
+            chattr "$flag" "$opt_backup" >/dev/null 2>&1 || true
+        done
+    fi
+    echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
 }
 
 # CIS Debian 12: 1.4.2, 1.6.4-6, 2.4.1.2-7, 2.4.1.8 (partially), 7.1.1-10, 5.1.1
@@ -340,7 +403,7 @@ configure_permissions() {
             chown root:shadow /etc/gshadow && chmod 640 /etc/gshadow
             chown root:shadow /etc/gshadow- && chmod 640 /etc/gshadow-
             ;;
-        centos|rocky|almalinux|fedora|opensuse*)
+        centos|rocky|almalinux|fedora|ol|opensuse*)
             chown root:root /etc/shadow && chmod 000 /etc/shadow
             chown root:root /etc/shadow- && chmod 000 /etc/shadow-
             chown root:root /etc/gshadow && chmod 000 /etc/gshadow
@@ -367,8 +430,17 @@ configure_permissions() {
 
 # CIS DEBIAN 12: 1.1.1.1-5,8-9, 3.2
 # MANUAL: 1.1.1.10
+# Will disable unnecessary kernel modules
 disable_kernel_modules() {
     modules=("cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage" "dccp" "tipc" "rds" "sctp")
     local fs_blacklist="/etc/modprobe.d/fs-blacklist.conf"
     return 1
 }
+
+
+# Will present the main menu
+main() { 
+    init
+}
+
+main
