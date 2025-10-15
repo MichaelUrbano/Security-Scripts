@@ -47,9 +47,6 @@
 # net.ipv4.conf.default.log_martians = 1
 # net.ipv4.tcp_syncookies = 1
 
-# TODO: Basic tar backup function (/etc/, /var/www/html/, /opt/) to directory specified in env (BAKDIR), defaults to /usr/sbin/ if unspecified
-# chattr +iauA <file>
-
 # TODO: Service auditor, checking if packages/services exist on the system, and if they should be removed/disabled (2.1)
 
 # TODO: (5.4.2)
@@ -66,12 +63,14 @@
 
 # TODO: Allow for overriding variables (DISTRO, PKG_MANAGER, FIREWALLS)
 
+# I will add set -e to this script, once it becomes important to make it stable and not possibly obliterate your system
+
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root, or with sudo." >&2
     exit 1
 fi
 
-source "$HOME/.env"
+source "$HOME/.env" || true
 
 # Sets up variables, and checks for important system information
 init() {
@@ -339,31 +338,31 @@ backup_directories() {
     fi
     local backup_path="${backup_directory}/b4"
     mkdir -p "${backup_path}"
-    chmod +t "${backup_path}"
+    chmod 1755 "${backup_path}"
     local flag
 
     if [ -d "/etc" ]; then
         echo -e "Backing up ${YELLOW}/etc${NC}"
         local etc_backup="${backup_path}/ettc-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$etc_backup" /etc
-        for flag in i a u A; do
-            chattr "$flag" "$etc_backup" >/dev/null 2>&1 || true
+        for flag in u a i; do
+            chattr +"$flag" "$etc_backup" >/dev/null 2>&1 || true
         done
     fi
     if [ -d "/var/www/html" ]; then
         echo -e "Backing up ${YELLOW}/var/www/html${NC}"
         local html_backup="${backup_path}/httml-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$html_backup" /var/www/html >/dev/null 2>&1 || true
-        for flag in i a u A; do
-            chattr "$flag" "$html_backup" >/dev/null 2>&1 || true
+        for flag in u a i; do
+            chattr +"$flag" "$html_backup" >/dev/null 2>&1 || true
         done
     fi
     if [ -d "/opt" ]; then
         echo -e "Backing up ${YELLOW}/opt${NC}"
         local opt_backup="${backup_path}/oppt-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$opt_backup" /opt >/dev/null 2>&1 || true
-        for flag in i a u A; do
-            chattr "$flag" "$opt_backup" >/dev/null 2>&1 || true
+        for flag in u a i; do
+            chattr +"$flag" "$opt_backup" >/dev/null 2>&1 || true
         done
     fi
     echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
@@ -433,8 +432,16 @@ configure_permissions() {
 # Will disable unnecessary kernel modules
 disable_kernel_modules() {
     modules=("cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage" "dccp" "tipc" "rds" "sctp")
-    local fs_blacklist="/etc/modprobe.d/fs-blacklist.conf"
-    return 1
+    local custom_blacklist="/etc/modprobe.d/custom-blacklist.conf"
+    local mod
+    touch "$custom_blacklist"
+
+    # Check for duplicates, then add an entry if it doesn't exist.
+    for mod in "{$modules[@]}"; do
+        if ! grep -qE "^install[[:space:]]+$mod[[:space:]]+" "$custom_blacklist"; then
+            echo "install $mod /bin/false" >> "$custom_blacklist"
+        fi
+    done
 }
 
 
