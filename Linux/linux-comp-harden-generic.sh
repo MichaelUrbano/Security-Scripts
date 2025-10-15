@@ -34,18 +34,8 @@
 # TODO: 3.1.1 should be left up to user through sysctl (ipv6 necessary or not?)
 # TODO: 7.1.13 could likely be implemented via linpeas.sh
 
-# TODO: sysctl should do the following in a function:
-# kernel.randomize_va_space = 2
-# kernel.yama.ptrace_scope = 2
-# fs.suid_dumpable = 0 (and in /etc/security/limits.d/ add: * hard core 0)
-# net.ipv6.conf.all.disable_ipv6 = 0 (optional, ipv6 might be needed)
-# net.ipv4.icmp_ignore_bogus_error_responses = 1
-# net.ipv4.icmp_echo_ignore_broadcasts = 1
-# net.ipv4.conf.all.rp_filter = 2
-# net.ipv4.conf.default.rp_filter = 2
-# net.ipv4.conf.all.log_martians = 1
-# net.ipv4.conf.default.log_martians = 1
-# net.ipv4.tcp_syncookies = 1
+# TODO: net.ipv6.conf.all.disable_ipv6 = 0
+# Optionally disable ipv6 on the system.
 
 # TODO: Service auditor, checking if packages/services exist on the system, and if they should be removed/disabled (2.1)
 
@@ -65,24 +55,22 @@
 
 # I will add set -e to this script, once it becomes important to make it stable and not possibly obliterate your system
 
+# Set ANSI Escape Code variables for different colors in the terminal
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m]'
+CYAN='\033[0;36m]'
+NC='\033[0m'
+
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root, or with sudo." >&2
     exit 1
 fi
 
-source "$HOME/.env" || true
-
 # Sets up variables, and checks for important system information
 init() {
-    # Set ANSI Escape Code variables for different colors in the terminal
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    BLUE='\033[0;34m'
-    MAGENTA='\033[0;35m]'
-    CYAN='\033[0;36m]'
-    NC='\033[0m'
-
     # Determine distro being used
     if [ -f /etc/os-release ]; then
         # freedesktop.org and systemd
@@ -292,6 +280,10 @@ upgrade_system() {
     esac
 }
 
+check_installed_services() {
+    echo "Not Yet Implemented"
+}
+
 install_recommended_software() {
     case "$DISTRO" in
         debian)
@@ -339,7 +331,7 @@ backup_directories() {
     local backup_path="${backup_directory}/b4"
     mkdir -p "${backup_path}"
     chmod 1755 "${backup_path}"
-    local flag
+    local flag=""
 
     if [ -d "/etc" ]; then
         echo -e "Backing up ${YELLOW}/etc${NC}"
@@ -371,53 +363,157 @@ backup_directories() {
 # CIS Debian 12: 1.4.2, 1.6.4-6, 2.4.1.2-7, 2.4.1.8 (partially), 7.1.1-10, 5.1.1
 configure_permissions() {
     # 1.4.2
-    chown root:root /boot/grub/grub.cfg && chmod 0600 /boot/grub/grub.cfg
+    if [ -f /etc/grub/grub.cfg ]; then
+        chown root:root /boot/grub/grub.cfg && chmod 0600 /boot/grub/grub.cfg
+    else
+        echo -e "${CYAN}File ${YELLOW}/boot/grub/grub.cfg${RED} Does not exist.${NC}"
+    fi
 
     # 1.6.4-6
-    [ -e /etc/motd ] && chown root:root /etc/motd && chmod 644 /etc/motd
-    [ -e /etc/issue ] && chown root:root /etc/issue && chmod 644 /etc/issue
-    [ -e /etc/issue.net ] && chown root:root /etc/issue.net && chmod 644 /etc/issue.net
+    if [ -f /etc/motd ]; then
+        chown root:root /etc/motd && chmod 644 /etc/motd
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/motd${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/issue ]; then
+        chown root:root /etc/issue && chmod 644 /etc/issue
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/issue${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/issue.net ]; then
+        chown root:root /etc/issue.net && chmod 644 /etc/issue.net
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/issue${RED} Does not exist.${NC}"
+    fi
 
     # 2.4.1.2-7
-    [ -e /etc/crontab ] && chown root:root /etc/crontab && chmod 600 /etc/crontab
-    [ -e /etc/cron.hourly ] && chown root:root /etc/cron.hourly && chmod 700 /etc/cron.hourly
-    [ -e /etc/cron.daily ] && chown root:root /etc/cron.daily && chmod 700 /etc/cron.daily
-    [ -e /etc/cron.weekly ] && chown root:root /etc/cron.weekly && chmod 700 /etc/cron.weekly
-    [ -e /etc/cron.monthly ] && chown root:root /etc/cron.monthly && chmod 700 /etc/cron.monthly
-    [ -e /etc/cron.d ] && chown root:root /etc/cron.d && chmod 700 /etc/cron.d
+    if [ -f /etc/crontab ]; then 
+        chown root:root /etc/crontab && chmod 600 /etc/crontab
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/crontab${RED} Does not exist.${NC}"
+    fi
+    if [ -d /etc/cron.hourly ]; then
+        chown root:root /etc/cron.hourly && chmod 700 /etc/cron.hourly
+    else
+        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
+    fi
+    if [ -d /etc/cron.daily ]; then
+        chown root:root /etc/cron.daily && chmod 700 /etc/cron.daily
+    else
+        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
+    fi
+    if [ -d /etc/cron.weekly ]; then
+        chown root:root /etc/cron.weekly && chmod 700 /etc/cron.weekly
+    else
+        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
+    fi
+    if [ -d /etc/cron.monthly ]; then
+        chown root:root /etc/cron.monthly && chmod 700 /etc/cron.monthly
+    else
+        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
+    fi
+    if [ -d /etc/cron.d ]; then
+        chown root:root /etc/cron.d && chmod 700 /etc/cron.d
+    else
+        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.d${RED} Does not exist.${NC}"
+    fi
 
     # 2.4.1.8 (partially) (possible issues on systems with crontab group)
     #[ -f /etc/cron.allow] && chown root:root /etc/cron.allow && chmod 640 /etc/cron.allow
     #[ -f /etc/cron.deny] && chown root:root /etc/cron.deny && chmod 640 /etc/cron.deny
 
     # 7.1.1-10
-    chown root:root /etc/passwd && chmod 644 /etc/passwd
-    chown root:root /etc/passwd- && chmod 644 /etc/passwd-
-    chown root:root /etc/group && chmod 644 /etc/group
-    chown root:root /etc/group- && chmod 644 /etc/group-
+    if [ -f /etc/passwd ]; then
+        chown root:root /etc/passwd && chmod 644 /etc/passwd
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/passwd${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/passwd- ]; then
+        chown root:root /etc/passwd- && chmod 644 /etc/passwd-
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/passwd-${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/group ]; then
+        chown root:root /etc/group && chmod 644 /etc/group
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/group${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/group- ]; then
+        chown root:root /etc/group- && chmod 644 /etc/group-
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/group-${RED} Does not exist.${NC}"
+    fi
     case "$DISTRO" in
         debian|ubuntu)
-            chown root:shadow /etc/shadow && chmod 640 /etc/shadow
-            chown root:shadow /etc/shadow- && chmod 640 /etc/shadow-
-            chown root:shadow /etc/gshadow && chmod 640 /etc/gshadow
-            chown root:shadow /etc/gshadow- && chmod 640 /etc/gshadow-
+            if [ -f /etc/shadow ]; then
+                chown root:shadow /etc/shadow && chmod 640 /etc/shadow
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/shadow${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/shadow- ]; then
+                chown root:shadow /etc/shadow- && chmod 640 /etc/shadow-
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/shadow-${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/gshadow ]; then
+                chown root:shadow /etc/gshadow && chmod 640 /etc/gshadow
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/gshadow${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/gshadow- ]; then
+                chown root:shadow /etc/gshadow- && chmod 640 /etc/gshadow-
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/gshadow-${RED} Does not exist.${NC}"
+            fi
             ;;
         centos|rocky|almalinux|fedora|ol|opensuse*)
-            chown root:root /etc/shadow && chmod 000 /etc/shadow
-            chown root:root /etc/shadow- && chmod 000 /etc/shadow-
-            chown root:root /etc/gshadow && chmod 000 /etc/gshadow
-            chown root:root /etc/gshadow- && chmod 000 /etc/gshadow-
+            if [ -f /etc/shadow ]; then
+                chown root:root /etc/shadow && chmod 000 /etc/shadow
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/shadow${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/shadow- ]; then
+                chown root:root /etc/shadow- && chmod 000 /etc/shadow-
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/shadow-${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/gshadow ]; then
+                chown root:root /etc/gshadow && chmod 000 /etc/gshadow
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/gshadow${RED} Does not exist.${NC}"
+            fi
+            if [ -f /etc/gshadow- ]; then
+                chown root:root /etc/gshadow- && chmod 000 /etc/gshadow-
+            else
+                echo -e "${CYAN}File ${YELLOW}/etc/gshadow-${RED} Does not exist.${NC}"
+            fi
             ;;
         *)
-            echo "go configure /etc/shadow and /etc/gshadow yourself buddy"
+            echo "You should configure /etc/shadow and /etc/gshadow yourself."
             ;;
     esac
-    chown root:root /etc/shells && chmod 644 /etc/shells
-    [ -e /etc/security/opasswd ] && chown root:root /etc/security/opasswd && chmod 600 /etc/security/opasswd
-    [ -e /etc/security/opasswd.old ] && chown root:root /etc/security/opasswd.old && chmod 600 /etc/security/opasswd.old
+    if [ -f /etc/shells ]; then
+        chown root:root /etc/shells && chmod 644 /etc/shells
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/shells${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/security/opasswd ]; then
+        chown root:root /etc/security/opasswd && chmod 600 /etc/security/opasswd
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/security/opasswd${RED} Does not exist.${NC}"
+    fi
+    if [ -f /etc/security/opasswd.old ]; then
+        chown root:root /etc/security/opasswd.old && chmod 600 /etc/security/opasswd.old
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/security/opasswd.old${RED} Does not exist.${NC}"
+    fi
 
     # 5.1.1
-    [ -e /etc/ssh/sshd_config ] && chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
+    if [ -f /etc/ssh/sshd_config ]; then
+        chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
+    else
+        echo -e "${CYAN}File ${YELLOW}/etc/security/sshd_config${RED} Does not exist.${NC}"
+    fi
     if [ -d /etc/ssh/sshd_config.d ]; then
         for file in /etc/ssh/sshd_config.d/*.conf; do
             [ -e "$file" ] || continue
@@ -436,7 +532,7 @@ disable_kernel_modules() {
     local mod
     touch "$custom_blacklist"
 
-    # Check for duplicates, then add an entry if it doesn't exist.
+    # Check for duplicates entries, then add an entry if it doesn't exist.
     for mod in "{$modules[@]}"; do
         if ! grep -qE "^install[[:space:]]+$mod[[:space:]]+" "$custom_blacklist"; then
             echo "install $mod /bin/false" >> "$custom_blacklist"
@@ -444,10 +540,58 @@ disable_kernel_modules() {
     done
 }
 
+configure_sysctl() {
+    local sysctl_file="/etc/sysctl.d/99-hardening.conf"
+    local limits_file="/etc/security/limits.d/99-disable-dump.conf"
+
+    declare -A settings=(
+        ["kernel\.randomize_va_space"]="2"
+        ["kernel\.yama\.ptrace_scope"]="2"
+        ["fs\.suid_dumpable"]="0"
+        ["net\.ipv4\.icmp_ignore_bogus_error_responses"]="1"
+        ["net\.ipv4\.icmp_echo_ignore_broadcasts"]="1"
+        ["net\.ipv4\.conf\.all\.rp_filter"]="2"
+        ["net\.ipv4\.conf\.default\.rp_filter"]="2"
+        ["net\.ipv4\.conf\.all\.log_martians"]="1"
+        ["net\.ipv4\.conf\.default\.log_martians"]="1"
+        ["net\.ipv4\.tcp_syncookies"]="1"
+    )
+
+    touch "$sysctl_file"
+    touch "$limits_file"
+
+    # Here is a simplified explanation of this terrifying code:
+    # We iterate through each KEY in the associative array called settings (!settings[@])
+    # The settings array has multiple escape characters for periods, so grep doesn't interpret them as a metacharacter
+    # We then fetch the VALUE for that specific key (settings[$key])
+    # If we can find the line which has the relevant key, we edit it with sed to change to the correct value
+    # Otherwise, we append a new line with the correct key=value pair
+    # We also use sysctl -w to immediately apply the change
+    # (this may be complete overkill)
+    for key in "${!settings[@]}"; do
+        local value="${settings[$key]}"
+        if grep -q -E "^${key}\s*=" "$sysctl_file"; then
+            sed -i "s|^${key}\s*=.*|${key} = ${value}|" "$sysctl_file"
+        else
+            echo "${key} = ${value}" >> "$sysctl_file"
+        fi
+
+        sysctl -w "${key}=${value}" >/dev/null 2>&1
+    done
+
+    # Disable core dumps
+    if [ ! -d "/etc/security/limits.d" ]; then
+        mkdir -p /etc/security/limits.d
+    fi
+    echo "* hard core 0" > "$limits_file"
+
+}
+
 
 # Will present the main menu
 main() { 
     init
+    source "$HOME/.env" || echo "Couldn't find .env file"
 }
 
 main
