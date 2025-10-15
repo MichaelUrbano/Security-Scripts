@@ -62,7 +62,7 @@ declare -r CYAN='\033[0;36m'
 declare -r NC='\033[0m'
 
 if [ "$EUID" -ne 0 ]; then
-    echo "This script must be run as root, or with sudo." >&2
+    echo -e "${BLUE}This script must be run as ${RED}root${BLUE}, or with sudo.${NC}" >&2
     exit 1
 fi
 
@@ -93,7 +93,7 @@ init() {
         VER=$(uname -r)
     fi
     DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
-    echo -e "${GREEN}Distribution ID:${NC} $DISTRO"
+    echo -e "${GREEN}Distribution ID:${NC} $DISTRO $VER"
 
     # Choose correct package manager for distro
     case "$DISTRO" in
@@ -300,7 +300,7 @@ check_installed_packages() {
                 ldap-utils ftp tnftp netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
                 pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
             )
-            for pkg in ${candidate_pkgs[@]}; do
+            for pkg in "${candidate_pkgs[@]}"; do
                 dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg")
             done
             ;;
@@ -310,7 +310,7 @@ check_installed_packages() {
                 net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp openldap-clients ypbind telnet tftp 
                 netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
             )
-            for pkg in ${candidate_pkgs[@]}; do
+            for pkg in "${candidate_pkgs[@]}"; do
                 rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg")
             done
             ;;
@@ -319,7 +319,7 @@ check_installed_packages() {
             ;;
     esac
     echo -e "${YELLOW}The following packages of concern were found:${NC}"
-    for pkg in ${PACKAGES[@]}; do
+    for pkg in "${PACKAGES[@]}"; do
         echo -e "${RED}$pkg${NC}"
     done
 }
@@ -399,7 +399,8 @@ backup_directories() {
 
     if [ -d "/etc" ]; then
         echo -e "Backing up ${YELLOW}/etc${NC}"
-        local etc_backup="${backup_path}/ettc-$(date +%b-%d-%H.%M.%S)"
+        local etc_backup=""
+        etc_backup="${backup_path}/ettc-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$etc_backup" /etc
         for flag in u a i; do
             chattr +"$flag" "$etc_backup" &> /dev/null || true
@@ -407,7 +408,8 @@ backup_directories() {
     fi
     if [ -d "/var/www/html" ]; then
         echo -e "Backing up ${YELLOW}/var/www/html${NC}"
-        local html_backup="${backup_path}/httml-$(date +%b-%d-%H.%M.%S)"
+        local html_backup=""
+        html_backup="${backup_path}/httml-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$html_backup" /var/www/html &> /dev/null || true
         for flag in u a i; do
             chattr +"$flag" "$html_backup" &> /dev/null || true
@@ -415,7 +417,8 @@ backup_directories() {
     fi
     if [ -d "/opt" ]; then
         echo -e "Backing up ${YELLOW}/opt${NC}"
-        local opt_backup="${backup_path}/oppt-$(date +%b-%d-%H.%M.%S)"
+        local opt_backup=""
+        opt_backup="${backup_path}/oppt-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$opt_backup" /opt &> /dev/null || true
         for flag in u a i; do
             chattr +"$flag" "$opt_backup" &> /dev/null || true
@@ -597,8 +600,8 @@ disable_kernel_modules() {
     touch "$custom_blacklist"
 
     # Check for duplicates entries, then add an entry if it doesn't exist.
-    for mod in "{$modules[@]}"; do
-        if ! grep -qE "^install[[:space:]]+$mod[[:space:]]+" "$custom_blacklist"; then
+    for mod in "${modules[@]}"; do
+        if ! grep -qE "^install[[:space:]]+${mod}[[:space:]]+" "$custom_blacklist"; then
             echo "install $mod /bin/false" >> "$custom_blacklist"
         fi
     done
