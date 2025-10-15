@@ -37,8 +37,6 @@
 # TODO: net.ipv6.conf.all.disable_ipv6 = 0
 # Optionally disable ipv6 on the system.
 
-# TODO: Service auditor, checking if packages/services exist on the system, and if they should be removed/disabled (2.1)
-
 # TODO: (5.4.2)
 
 # TODO: (5.4.3.1, 5.4.3.2-3(?))
@@ -51,18 +49,17 @@
 
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
-# TODO: Allow for overriding variables (DISTRO, PKG_MANAGER, FIREWALLS)
-
-# I will add set -e to this script, once it becomes important to make it stable and not possibly obliterate your system
+# I will add set -euo pipefail to this script, once it becomes important to make it stable and not possibly obliterate your system
+set -u
 
 # Set ANSI Escape Code variables for different colors in the terminal
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m]'
-CYAN='\033[0;36m]'
-NC='\033[0m'
+declare -r RED='\033[0;31m'
+declare -r GREEN='\033[0;32m'
+declare -r YELLOW='\033[0;33m'
+declare -r BLUE='\033[0;34m'
+declare -r MAGENTA='\033[0;35m'
+declare -r CYAN='\033[0;36m'
+declare -r NC='\033[0m'
 
 if [ "$EUID" -ne 0 ]; then
     echo "This script must be run as root, or with sudo." >&2
@@ -77,7 +74,7 @@ init() {
         . /etc/os-release
         DISTRO=$ID
         VER=$VERSION_ID
-    elif type lsb_release > /dev/null 2>&1; then
+    elif type lsb_release &> /dev/null; then
         # linuxbase.org
         DISTRO=$(lsb_release -si)
         VER=$(lsb_release -sr)
@@ -101,10 +98,20 @@ init() {
     # Choose correct package manager for distro
     case "$DISTRO" in
         ubuntu|debian|linuxmint)
-            PKG_MANAGER="apt"
+            if command -v apt &> /dev/null; then
+                PKG_MANAGER="apt"
+            else
+                PKG_MANAGER="dpkg"
+            fi
             ;;
-        centos|rocky|almalinux|fedora|ol)
-            PKG_MANAGER="yum"
+        centos|rocky|almalinux|fedora|rhel|ol)
+            if command -v dnf &> /dev/null; then
+                PKG_MANAGER="dnf"
+            elif command -v yum &> /dev/null; then
+                PKG_MANAGER="yum"
+            else
+                PKG_MANAGER="rpm"
+            fi
             ;;
         opensuse*)
             PKG_MANAGER="zypper"
@@ -120,25 +127,26 @@ init() {
     echo -e "${GREEN}Packge Manager:${NC} $PKG_MANAGER"
 
     # Find firewalls installed on the system
+    # This should be modified to use an indexed array rather than appending to a string
     FIREWALLS=""
 
     # firewalld
-    if command -v firewall-cmd >/dev/null 2>&1; then
+    if command -v firewall-cmd &> /dev/null; then
         FIREWALLS+="firewalld "
     fi
 
     # ufw
-    if command -v ufw >/dev/null 2>&1; then
+    if command -v ufw &> /dev/null; then
         FIREWALLS+="ufw "
     fi
 
     # nftables
-    if command -v nft >/dev/null 2>&1; then
+    if command -v nft &> /dev/null; then
         FIREWALLS+="nftables "
     fi
 
     # iptables
-    if command -v iptables >/dev/null 2>&1; then
+    if command -v iptables &> /dev/null; then
         FIREWALLS+="iptables "
     fi
 
@@ -215,23 +223,23 @@ remove_package() {
     case "$package_manager" in
         apt)
             echo "Using apt to remove $package_name..."
-            apt remove -y "$package_name"
+            apt remove "$package_name"
             ;;
         dnf)
             echo "Using dnf to remove $package_name..."
-            dnf remove -y "$package_name"
+            dnf remove "$package_name"
             ;;
         yum)
             echo "Using yum to remove $package_name..."
-            yum remove -y "$package_name"
+            yum remove "$package_name"
             ;;
         zypper)
             echo "Using zypper to remove $package_name..."
-            zypper remove -y "$package_name"
+            zypper remove "$package_name"
             ;;
         pacman)
             echo "Using pacman to remove $package_name..."
-            pacman -R --noconfirm "$package_name"
+            pacman -R "$package_name"
             ;;
         *)
             echo "Error: Unsupported package manager."
@@ -280,41 +288,97 @@ upgrade_system() {
     esac
 }
 
-check_installed_services() {
-    echo "Not Yet Implemented"
-}
-
-install_recommended_software() {
-    case "$DISTRO" in
-        debian)
-        # CIS Debian 12: 
-            install_package "$PKG_MANAGER" "sudo"
-            install_package "$PKG_MANAGER" "apparmor"
-            #install_package "$PKG_MANAGER" "systemd-journal-remote"
-            #install_package "$PKG_MANAGER" "rsyslog"
-            install_package "$PKG_MANAGER" "auditd"
-            install_package "$PKG_MANAGER" "aide"
+# CIS Debian 2.1 & 2.2
+check_installed_packages() {
+    PACKAGES=()
+    local pkg=""
+    case $DISTRO in
+        ubuntu|debian|linuxmint)
+            local -ar candidate_pkgs=(
+                autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd dovecot-imapd nfs-kernel-server ypserv cups rpcbind
+                rsync samba snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis rsh-client talk telnet inetutils-telnet
+                ldap-utils ftp tnftp netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
+                pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
+            )
+            for pkg in ${candidate_pkgs[@]}; do
+                dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg")
+            done
+            ;;
+        centos|rocky|almalinux|fedora|rhel|ol)
+            local -ar candidate_pkgs=(
+                mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups rpcbind rsync-daemon
+                net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp openldap-clients ypbind telnet tftp 
+                netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
+            )
+            for pkg in ${candidate_pkgs[@]}; do
+                rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg")
+            done
             ;;
         *)
-            echo "We don't know what your package manager is, sorry"
+            echo "You must manually check, sorry."
             ;;
     esac
+    echo -e "${YELLOW}The following packages of concern were found:${NC}"
+    for pkg in ${PACKAGES[@]}; do
+        echo -e "${RED}$pkg${NC}"
+    done
 }
 
-remove_recommended_software() {
+ask_to_remove_packages() {
+    echo "Not yet implemented."
+    return 1
+}
+
+install_recommended_packages() {
+    local remote_logging="false"
+    local extra_security="false"
+    local arg=""
+    local pkg=""
+
+    for arg in "$@"; do
+        case "$arg" in
+            remote_logging=true) remote_logging="true" ;;
+            remote_logging=false) remote_logging="false" ;;
+            extra_security=true) extra_security="true" ;;
+            extra_security=false) extra_security="false" ;;
+            *) echo "Unrecognized argument: $arg" >&2; return 1 ;;
+        esac
+    done
+
     case "$DISTRO" in
-        debian)
-            # CIS Debian 12: 2.2.1, 2.2.2, 2.2.3, 2.2.4, 2.2.6
-            # 2.2.5 Missing, ldap may be needed(?)
-            remove_package "$PKG_MANAGER" "nis"
-            remove_package "$PKG_MANAGER" "rsh-client"
-            remove_package "$PKG_MANAGER" "talk"
-            remove_package "$PKG_MANAGER" "telnet"
-            remove_package "$PKG_MANAGER" "tnftp"
-            remove_package "$PKG_MANAGER" "netcat"
+        ubuntu|debian)
+            if [ "$remote_logging" = "true" ]; then
+                for pkg in "rsyslog" "systemd-journal-remote"; do
+                    install_package "$PKG_MANAGER" "$pkg"
+                done
+            fi
+            if [ "$extra_security" = "true" ]; then
+                for pkg in "lynis" "clamav" "chkrootkit" "fail2ban"; do
+                    install_package "$PKG_MANAGER" "$pkg"
+                done
+            fi
+            for pkg in "sudo" "apparmor" "auditd" "aide"; do
+                install_package "$PKG_MANAGER" "$pkg"
+            done
+            ;;
+        centos|rocky|almalinux|fedora|rhel|ol)
+            if [ "$remote_logging" = "true" ]; then
+                for pkg in "rsyslog" "systemd-journal-remote"; do
+                    install_package "$PKG_MANAGER" "$pkg"
+                done
+            fi
+            if [ "$extra_security" = "true" ]; then
+                for pkg in "lynis" "clamav" "chkrootkit" "fail2ban"; do
+                    install_package "$PKG_MANAGER" "$pkg"
+                done
+            fi
+            for pkg in "sudo" "libselinux" "audit" "aide"; do
+                install_package "$PKG_MANAGER" "$pkg"
+            done
             ;;
         *)
-            echo "Nothing here yet, sorry."
+            echo "Unrecognized package manager"
+            return 1
             ;;
     esac
 }
@@ -338,23 +402,23 @@ backup_directories() {
         local etc_backup="${backup_path}/ettc-$(date +%b-%d-%H.%M.%S)"
         tar -cf "$etc_backup" /etc
         for flag in u a i; do
-            chattr +"$flag" "$etc_backup" >/dev/null 2>&1 || true
+            chattr +"$flag" "$etc_backup" &> /dev/null || true
         done
     fi
     if [ -d "/var/www/html" ]; then
         echo -e "Backing up ${YELLOW}/var/www/html${NC}"
         local html_backup="${backup_path}/httml-$(date +%b-%d-%H.%M.%S)"
-        tar -cf "$html_backup" /var/www/html >/dev/null 2>&1 || true
+        tar -cf "$html_backup" /var/www/html &> /dev/null || true
         for flag in u a i; do
-            chattr +"$flag" "$html_backup" >/dev/null 2>&1 || true
+            chattr +"$flag" "$html_backup" &> /dev/null || true
         done
     fi
     if [ -d "/opt" ]; then
         echo -e "Backing up ${YELLOW}/opt${NC}"
         local opt_backup="${backup_path}/oppt-$(date +%b-%d-%H.%M.%S)"
-        tar -cf "$opt_backup" /opt >/dev/null 2>&1 || true
+        tar -cf "$opt_backup" /opt &> /dev/null || true
         for flag in u a i; do
-            chattr +"$flag" "$opt_backup" >/dev/null 2>&1 || true
+            chattr +"$flag" "$opt_backup" &> /dev/null || true
         done
     fi
     echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
@@ -466,7 +530,7 @@ configure_permissions() {
                 echo -e "${CYAN}File ${YELLOW}/etc/gshadow-${RED} Does not exist.${NC}"
             fi
             ;;
-        centos|rocky|almalinux|fedora|ol|opensuse*)
+        centos|rocky|almalinux|fedora|rhel|ol|opensuse*)
             if [ -f /etc/shadow ]; then
                 chown root:root /etc/shadow && chmod 000 /etc/shadow
             else
@@ -523,13 +587,13 @@ configure_permissions() {
     fi
 }
 
-# CIS DEBIAN 12: 1.1.1.1-5,8-9, 3.2
+# CIS Debian 12: 1.1.1.1-5,8-9, 3.2
 # MANUAL: 1.1.1.10
 # Will disable unnecessary kernel modules
 disable_kernel_modules() {
     modules=("cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage" "dccp" "tipc" "rds" "sctp")
     local custom_blacklist="/etc/modprobe.d/custom-blacklist.conf"
-    local mod
+    local mod=""
     touch "$custom_blacklist"
 
     # Check for duplicates entries, then add an entry if it doesn't exist.
@@ -540,6 +604,7 @@ disable_kernel_modules() {
     done
 }
 
+# Configure sysctl parameters to harden the system
 configure_sysctl() {
     local sysctl_file="/etc/sysctl.d/99-hardening.conf"
     local limits_file="/etc/security/limits.d/99-disable-dump.conf"
@@ -576,7 +641,7 @@ configure_sysctl() {
             echo "${key} = ${value}" >> "$sysctl_file"
         fi
 
-        sysctl -w "${key}=${value}" >/dev/null 2>&1
+        sysctl -w "${key}=${value}" &> /dev/null
     done
 
     # Disable core dumps
@@ -587,11 +652,11 @@ configure_sysctl() {
 
 }
 
-
 # Will present the main menu
 main() { 
     init
-    source "$HOME/.env" || echo "Couldn't find .env file"
+    source "$HOME/.env" &> /dev/null || echo -e "${YELLOW}Couldn't find .env file${NC}"
+    check_installed_packages
 }
 
 main
