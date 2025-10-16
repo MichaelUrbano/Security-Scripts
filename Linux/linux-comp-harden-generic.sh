@@ -46,23 +46,23 @@
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
 # I will add set -euo pipefail to this script, once it becomes important to make it stable and not possibly obliterate your system
-set -u
+set -uo pipefail
 
 # Set ANSI Escape Code variables for different colors in the terminal
-declare -r RED='\033[0;31m'
-declare -r GREEN='\033[0;32m'
-declare -r YELLOW='\033[0;33m'
-declare -r BLUE='\033[0;34m'
-declare -r MAGENTA='\033[0;35m'
-declare -r CYAN='\033[0;36m'
-declare -r NC='\033[0m'
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
+readonly BLUE='\033[0;34m'
+readonly MAGENTA='\033[0;35m'
+readonly CYAN='\033[0;36m'
+readonly NC='\033[0m'
 
 if [ "$EUID" -ne 0 ]; then
     echo -e "${BLUE}This script must be run as ${RED}root${BLUE}, or with sudo.${NC}" >&2
     exit 1
 fi
 
-# Sets up variables, and checks for important system information
+# Sets up global variables, and checks for important system information
 init() {
     # Determine distro being used
     if [ -f /etc/os-release ]; then
@@ -123,33 +123,33 @@ init() {
     echo -e "${GREEN}Packge Manager:${NC} $PKG_MANAGER"
 
     # Find firewalls installed on the system
-    # This should be modified to use an indexed array rather than appending to a string
-    FIREWALLS=""
+    FIREWALLS=()
+    local firewall=""
 
     # firewalld
     if command -v firewall-cmd &> /dev/null; then
-        FIREWALLS+="firewalld "
+        FIREWALLS+=("firewalld")
     fi
 
     # ufw
     if command -v ufw &> /dev/null; then
-        FIREWALLS+="ufw "
+        FIREWALLS+=("ufw")
     fi
 
     # nftables
     if command -v nft &> /dev/null; then
-        FIREWALLS+="nftables "
+        FIREWALLS+=("nftables")
     fi
 
     # iptables
     if command -v iptables &> /dev/null; then
-        FIREWALLS+="iptables "
+        FIREWALLS+=("iptables")
     fi
 
-    # Trim trailing space
-    FIREWALLS="${FIREWALLS%" "}"
-
-    echo -e "${GREEN}Installed Firewalls:${NC} ${RED}$FIREWALLS${NC}"
+    echo -e "${GREEN}Installed Firewalls:${NC}"
+    for firewall in "${FIREWALLS[@]}"; do
+        echo -e "${RED}${firewall}${NC}"
+    done
 }
 
 install_package() {
@@ -293,7 +293,7 @@ check_installed_packages() {
             local -ar candidate_pkgs=(
                 autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd dovecot-imapd nfs-kernel-server ypserv cups rpcbind
                 rsync samba snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis rsh-client talk telnet inetutils-telnet
-                ldap-utils ftp tnftp netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
+                ldap-utils ftp tnftp gnome netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
                 pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
             )
             for pkg in "${candidate_pkgs[@]}"; do
@@ -303,8 +303,8 @@ check_installed_packages() {
         centos|rocky|almalinux|fedora|rhel|ol)
             local -ar candidate_pkgs=(
                 mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups rpcbind rsync-daemon
-                net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp openldap-clients ypbind telnet tftp 
-                netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
+                net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp openldap-clients ypbind telnet tftp @graphical-server-environment
+                @workstation-product-environment netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
             )
             for pkg in "${candidate_pkgs[@]}"; do
                 rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg")
@@ -320,6 +320,8 @@ check_installed_packages() {
     done
 }
 
+# Debian 2.1 & 2.2
+# Requires user interaction
 ask_to_remove_packages() {
     if [ ${#PACKAGES[@]} -eq 0 ]; then
         echo -e "${RED}There are no packages to remove. (did you run check_installed_packages?)${NC}"
@@ -599,6 +601,102 @@ configure_permissions() {
     fi
 }
 
+# CIS Debian 12: 4
+# This is a function which will do some initialization for firewalls
+# This function is not yet safe, since it doesn't really do any actions atomically/create backups of configurations
+init_firewall() {
+    # CIS Debian 12: 4.1
+    if [ ${#FIREWALLS[@]} -eq 0 ]; then
+        echo "Please install a firewall onto the system, then try again."
+        return 1
+    fi
+
+    # Checks should be put in place to see if a table/chain/rule already exists
+    if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+        systemctl enable --now firewalld
+        systemctl disable --now nftables &> /dev/null || true
+        systemctl disable --now netfilter-persistent &> /dev/null || true
+        systemctl disable --now ufw &> /dev/null || true
+        firewall-cmd --permanent --set-default-zone=public
+        firewall-cmd --permanent --zone=trusted --add-interface=lo
+        firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
+        firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
+        firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+        firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
+        systemctl enable --now ufw
+        ufw enable
+        systemctl disable --now nftables &> /dev/null || true
+        systemctl disable --now netfilter-persistent &> /dev/null || true
+        systemctl disable --now firewalld &> /dev/null || true
+        ufw allow in on lo
+        ufw allow out on lo
+        ufw deny in from 127.0.0.0/8
+        ufw deny in from ::1
+    elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
+        systemctl disable --now netfilter-persistent &> /dev/null || true
+        systemctl disable --now firewalld &> /dev/null || true
+        systemctl disable --now ufw &> /dev/null || true
+        nft create table inet filter
+        nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
+        nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
+        nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
+        nft add rule inet filter INPUT iif lo accept
+        nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
+        nft add rule inet filter INPUT ip protocol tcp ct state established accept
+        nft add rule inet filter INPUT ip protocol udp ct state established accept
+        nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
+        nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
+        nft list ruleset > /etc/nftables.conf
+        cp /etc/nftables.conf /etc/sysconfig/nftables.conf
+    elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
+        systemctl disable --now nftables &> /dev/null || true
+        systemctl disable --now firewalld  &> /dev/null || true
+        systemctl disable --now ufw &> /dev/null || true
+        iptables -F &> /dev/null || true
+        ip6tables -F &> /dev/null || true
+        iptables -P FORWARD DROP
+        iptables -A INPUT -i lo -j ACCEPT
+        iptables -A OUTPUT -o lo -j ACCEPT
+        iptables -A INPUT -s 127.0.0.0/8 -j DROP
+        iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+        iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+        iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+        iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
+        iptables-save > /etc/iptables/rules.v4
+        ip6tables -P FORWARD DROP
+        ip6tables -A INPUT -i lo -j ACCEPT
+        ip6tables -A OUTPUT -o lo -j ACCEPT
+        ip6tables -A INPUT -s ::1 -j DROP
+        ip6tables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+        ip6tables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+        ip6tables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+        ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
+        ip6tables-save > /etc/iptables/rules.v6
+    fi
+}
+
+# Requires user interaction
+configure_firewall() {
+    return 1
+}
+
+configure_auditd() {
+    return 1
+}
+
+configure_aide() {
+    return 1
+}
+
+configure_fail2ban() {
+    return 1
+}
+
+configure_clamav() {
+    return 1
+}
+
 # CIS Debian 12: 1.1.1.1-5,8-9, 3.2
 # MANUAL: 1.1.1.10
 # Will disable unnecessary kernel modules
@@ -681,7 +779,7 @@ configure_sysctl() {
 }
 
 # Will present the main menu
-main() { 
+main() {
     init
     source "$HOME/.env" &> /dev/null || echo -e "${YELLOW}Couldn't find .env file${NC}"
     check_installed_packages
