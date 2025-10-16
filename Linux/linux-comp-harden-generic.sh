@@ -31,7 +31,6 @@
 # Explanation: They are password hardening related, typically don't need to change for competitions(?)
 
 # TODO: please implement 2.1.22 in some way (ss -tulpn)
-# TODO: 3.1.1 should be left up to user through sysctl (ipv6 necessary or not?)
 # TODO: 7.1.13 could likely be implemented via linpeas.sh
 
 # TODO: (5.4.2)
@@ -322,7 +321,19 @@ check_installed_packages() {
 }
 
 ask_to_remove_packages() {
-    echo "Not yet implemented."
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        echo -e "${RED}There are no packages to remove. (did you run check_installed_packages?)${NC}"
+        return 1
+    fi
+    echo -e "${BLUE}You will be asked if you want to remove each package${NC}"
+    echo -e "${BLUE}look carefully at each, and determine if they are necessary or not.${NC}"
+    local pkg=""
+    for pkg in "${PACKAGES[@]}"; do
+        remove_package "$PKG_MANAGER" "$pkg"
+    done
+}
+
+auto_remove_packages() {
     return 1
 }
 
@@ -606,6 +617,7 @@ disable_kernel_modules() {
 }
 
 # Configure sysctl parameters to harden the system
+# CIS Debian 12: 3.1.1
 configure_sysctl() {
     local disable_ipv6="false"
     local arg=""
