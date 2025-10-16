@@ -55,18 +55,23 @@ readonly YELLOW='\033[0;33m'
 readonly BLUE='\033[0;34m'
 readonly MAGENTA='\033[0;35m'
 readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
 readonly NC='\033[0m'
 
+# Check root
 if [ "$EUID" -ne 0 ]; then
     echo -e "${BLUE}This script must be run as ${RED}root${BLUE}, or with sudo.${NC}" >&2
     exit 1
 fi
 
+# Set to "true" if you want to ignore the main menu, possibly to run functions directly
+SKIP_MAIN="false"
+
 # Sets up global variables, and checks for important system information
 init() {
     # Determine distro being used
     if [ -f /etc/os-release ]; then
-        # freedesktop.org and systemd
+        # freedesktop.org
         . /etc/os-release
         DISTRO=$ID
         VER=$VERSION_ID
@@ -118,7 +123,7 @@ init() {
         *)
             PKG_MANAGER="unsupported"
             ;;
-    esac 
+    esac
 
     echo -e "${GREEN}Packge Manager:${NC} $PKG_MANAGER"
 
@@ -146,10 +151,11 @@ init() {
         FIREWALLS+=("iptables")
     fi
 
-    echo -e "${GREEN}Installed Firewalls:${NC}"
+    echo -ne "${GREEN}Installed Firewalls: ${NC}"
     for firewall in "${FIREWALLS[@]}"; do
-        echo -e "${RED}${firewall}${NC}"
+        echo -ne "${RED}${firewall}${NC} "
     done
+    echo ""
 }
 
 install_package() {
@@ -293,7 +299,7 @@ check_installed_packages() {
             local -ar candidate_pkgs=(
                 autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd dovecot-imapd nfs-kernel-server ypserv cups rpcbind
                 rsync samba snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis rsh-client talk telnet inetutils-telnet
-                ldap-utils ftp tnftp gnome netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
+                ldap-utils ftp tnftp prelink apport gnome netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
                 pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
             )
             for pkg in "${candidate_pkgs[@]}"; do
@@ -368,7 +374,7 @@ install_recommended_packages() {
                     install_package "$PKG_MANAGER" "$pkg"
                 done
             fi
-            for pkg in "sudo" "apparmor" "auditd" "aide"; do
+            for pkg in "sudo" "apparmor" "auditd" "aide" "apparmor-profiles" "apparmor-profiles-extra" "apparmor-utils" "audispd-plugins"; do
                 install_package "$PKG_MANAGER" "$pkg"
             done
             ;;
@@ -383,7 +389,7 @@ install_recommended_packages() {
                     install_package "$PKG_MANAGER" "$pkg"
                 done
             fi
-            for pkg in "sudo" "libselinux" "audit" "aide"; do
+            for pkg in "sudo" "libselinux" "audit" "aide" "selinux-policy" "selinux-policy-targeted"; do
                 install_package "$PKG_MANAGER" "$pkg"
             done
             ;;
@@ -438,7 +444,17 @@ backup_directories() {
     echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
 }
 
+# CIS Debian 12: 1.1.2
+configure_partitions() {
+    return 1
+}
+
+configure_mac() {
+    return 1
+}
+
 # CIS Debian 12: 1.4.2, 1.6.4-6, 2.4.1.2-7, 2.4.1.8 (partially), 7.1.1-10, 5.1.1
+# Will be rewritten to use an array of colon-separated pieces of data rather than many if statements
 configure_permissions() {
     # 1.4.2
     if [ -f /etc/grub/grub.cfg ]; then
@@ -780,9 +796,126 @@ configure_sysctl() {
 
 # Will present the main menu
 main() {
+    clear
     init
-    source "$HOME/.env" &> /dev/null || echo -e "${YELLOW}Couldn't find .env file${NC}"
+    [[ -f $HOME/.env ]] && source "$HOME/.env" &> /dev/null || \
+        echo -e "${YELLOW}Couldn't find .env file${NC}"
     check_installed_packages
+    while true; do
+        printf "\n"
+        printf "${GREEN}%s${NC}\n" "Welcome to Michael's Linux Hardening Script (Generic Competition Edition)"
+        printf "${GREEN}%s${NC}\n" "Enter the name of an option below:"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "backup" "Will back up \"important directories\""
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "upgrade" "Will upgrade your system"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "remove" "Will ask to remove possibly unnecessary packages"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "install" "Will ask to install possibly helpful packages"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fwconf" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "audit" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "aide" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "quit" "Quit program"
+        printf "\n"
+        while true; do
+            read -rp "Enter an option: "
+            case $REPLY in
+                backup)
+                    backup_directories
+                    ;;
+                upgrade)
+                    upgrade_system "$PKG_MANAGER"
+                    ;;
+                remove)
+                    ask_to_remove_packages
+                    ;;
+                install)
+                    local option_one=""
+                    local option_two=""
+                    while true; do
+                        read -rp "Install remote logging packages? (y/n): " option_one
+                        case $option_one in
+                            y) option_one="true" && break ;;
+                            n) option_one="false" && break ;;
+                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                        esac
+                    done
+
+                    while true; do
+                        read -rp "Install extra security packages? (y/n): " option_two
+                        case $option_two in
+                            y) option_two="true" && break ;;
+                            n) option_two="false" && break ;;
+                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                        esac
+                    done
+
+                    install_recommended_packages "remote_logging=$option_one" "extra_security=$option_two"
+                    option_one=""
+                    option_two=""
+                    ;;
+                mac)
+                    configure_mac
+                    ;;
+                fwinit)
+                    init_firewall
+                    ;;
+                fwconf)
+                    configure_firewall
+                    ;;
+                audit)
+                    configure_auditd
+                    ;;
+                aide)
+                    configure_aide
+                    ;;
+                fail)
+                    configure_fail2ban
+                    ;;
+                clam)
+                    configure_clamav
+                    ;;
+                perms)
+                    configure_permissions
+                    ;;
+                modules)
+                    disable_kernel_modules
+                    ;;
+                sysctl)
+                    local option_one=""
+                    while true; do
+                        read -rp "Disable IPv6? (y/n): " option_one
+                        case $option_one in
+                            y) option_one="true" && break ;;
+                            n) option_one="false" && break ;;
+                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                        esac
+                    done
+
+                    configure_sysctl "disable_ipv6=$option_one"
+                    option_one=""
+                    ;;
+                quit)
+                    exit 0
+                    ;;
+                *)
+                    printf "${RED}%s${NC}\n" "Unrecognized option, try again"
+                    REPLY=""
+                    continue
+                    ;;
+            esac
+
+            REPLY=""
+            break
+        done
+    done
+    return 0
 }
 
-main
+if [[ "$SKIP_MAIN" != "true" ]]; then
+    main
+fi
