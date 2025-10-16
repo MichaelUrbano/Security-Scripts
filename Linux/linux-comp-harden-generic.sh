@@ -34,9 +34,6 @@
 # TODO: 3.1.1 should be left up to user through sysctl (ipv6 necessary or not?)
 # TODO: 7.1.13 could likely be implemented via linpeas.sh
 
-# TODO: net.ipv6.conf.all.disable_ipv6 = 0
-# Optionally disable ipv6 on the system.
-
 # TODO: (5.4.2)
 
 # TODO: (5.4.3.1, 5.4.3.2-3(?))
@@ -333,7 +330,6 @@ install_recommended_packages() {
     local remote_logging="false"
     local extra_security="false"
     local arg=""
-    local pkg=""
 
     for arg in "$@"; do
         case "$arg" in
@@ -344,6 +340,8 @@ install_recommended_packages() {
             *) echo "Unrecognized argument: $arg" >&2; return 1 ;;
         esac
     done
+
+    local pkg=""
 
     case "$DISTRO" in
         ubuntu|debian)
@@ -609,6 +607,17 @@ disable_kernel_modules() {
 
 # Configure sysctl parameters to harden the system
 configure_sysctl() {
+    local disable_ipv6="false"
+    local arg=""
+
+    for arg in "$@"; do
+        case "$arg" in
+            disable_ipv6=true) disable_ipv6="true" ;;
+            disable_ipv6=false) disable_ipv6="false" ;;
+            *) echo "Unrecognized argument: $arg" >&2; return 1 ;;
+        esac
+    done
+
     local sysctl_file="/etc/sysctl.d/99-hardening.conf"
     local limits_file="/etc/security/limits.d/99-disable-dump.conf"
 
@@ -624,6 +633,10 @@ configure_sysctl() {
         ["net\.ipv4\.conf\.default\.log_martians"]="1"
         ["net\.ipv4\.tcp_syncookies"]="1"
     )
+
+    if [ $disable_ipv6 = "true" ]; then
+        settings["net\.ipv6\.conf\.all\.disable_ipv6"]="0"
+    fi
 
     touch "$sysctl_file"
     touch "$limits_file"
