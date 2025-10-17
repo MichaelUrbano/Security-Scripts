@@ -222,7 +222,7 @@ init() {
             if [[ "$uid" -eq 0 ]]; then
                 echo -e "${RED}WARNING: Duplicate UID 0 account found${NC}"
             fi
-                awk -F: -v uid="$uid" OFS="|" '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
+                awk -F: -v uid="$uid" '($3 == uid) { print "User:", $1, "| UID:", $3 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_PRIMARY_GIDS[@]}" -gt 0 ]]; then
@@ -232,7 +232,7 @@ init() {
             if [[ "$pgid" -eq 0 ]]; then
                 echo -e "${RED}WARNING: Duplicate Primary GID 0 account found${NC}"
             fi
-                awk -F: -v pgid="$pgid" OFS="|" '($4 == pgid) { print "User: " $1, " GID: " $4 }' /etc/passwd
+                awk -F: -v pgid="$pgid" '($4 == pgid) { print "User:", $1, "| GID:", $4 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_USERNAMES[@]}" -gt 0 ]]; then
@@ -242,7 +242,7 @@ init() {
             if [[ "$username" = "root" ]]; then
                 echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}account found${NC}"
             fi
-                awk -F: -v username="$username" OFS=":" '($1 == username) { print $1, $2, $3, $4, $5, $6, $7 }' /etc/passwd
+                awk -F: -v username="$username" '($1 == username) { print $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ":" $7 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
@@ -252,7 +252,7 @@ init() {
             if [[ "$gid" -eq 0 ]]; then
                 echo -e "${RED}WARNING: Duplicate GID 0 group found${NC}"
             fi
-                awk -F: -v gid="$gid" OFS="|" '($3 == gid) { print "Group: " $1, " GID: " $3 }' /etc/group
+                awk -F: -v gid="$gid" '($3 == gid) { print "Group:", $1, "| GID:", $3 }' /etc/group
         done
     fi
     if [[ "${#DUPLICATE_GROUP_NAMES[@]}" -gt 0 ]]; then
@@ -262,7 +262,7 @@ init() {
             if [[ "$group_name" = "root" ]]; then
                 echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}group found${NC}"
             fi
-                awk -F: -v group_name="$group_name" OFS=":" '($1 == group_name) { print $1, $2, $3 }' /etc/passwd
+                awk -F: -v group_name="$group_name" '($1 == group_name) { print $1 ":" $2 ":" $3 }' /etc/group
         done
     fi
 
