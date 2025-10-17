@@ -48,13 +48,13 @@
 # I will add set -euo pipefail to this script, once it becomes important to make it stable and not possibly obliterate your system
 set -uo pipefail
 
-# Set ANSI Escape Code variables for different colors in the terminal
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[0;33m'
-readonly BLUE='\033[0;34m'
-readonly MAGENTA='\033[0;35m'
-readonly CYAN='\033[0;36m'
+# Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
+readonly RED='\033[0;31m' # For Warnings
+readonly GREEN='\033[0;32m' # For "All Clear"
+readonly YELLOW='\033[0;33m' # For Commands or Options
+readonly BLUE='\033[0;34m' # For Info
+readonly MAGENTA='\033[0;35m' # For Directories
+readonly CYAN='\033[0;36m' # For Files
 readonly BOLD='\033[1m'
 readonly NC='\033[0m'
 
@@ -156,6 +156,46 @@ init() {
         echo -ne "${RED}${firewall}${NC} "
     done
     echo ""
+
+    # Check if commands are present, and if their services are enabled
+    # One of these should be added for aide
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint)
+            if systemctl is-active --quiet apparmor; then
+                echo -e "${YELLOW}apparmor.service ${NC}: ${GREEN}running${NC}"
+                if command -v aa-status &> /dev/null; then
+                    echo -e "${YELLOW}apparmor-utils ${NC}: ${GREEN}installed${NC}"
+                else
+                    echo -e "${YELLOW}apparmor-utils ${NC}: ${RED}missing${NC}"
+                fi
+            else
+                echo -e "${YELLOW}apparmor.service ${NC}: ${RED}not running${NC}"
+            fi
+            ;;
+        centos|rocky|almalinux|fedora|rhel|ol|opensuse*)
+            if [[ ! -e /sys/fs/selinux/enforce ]]; then
+                echo -e "${YELLOW}SELinux ${NC}: ${RED}not enabled${NC}"
+            elif [[ $(cat /sys/fs/selinux/enforce) -eq 1 ]]; then
+                echo -e "${YELLOW}SELinux ${NC}: ${GREEN}enforcing${NC}"
+            else
+                echo -e "${YELLOW}SELinux ${NC}: ${RED}not enforcing${NC}"
+            fi
+            ;;
+    esac
+
+    if systemctl is-active --quiet auditd; then
+        echo -e "${YELLOW}auditd.service ${NC}: ${GREEN}running${NC}"
+    else
+        echo -e "${YELLOW}auditd.service ${NC}: ${RED}not running${NC}"
+    fi
+
+    if systemctl is-active --quiet dailyaidecheck.timer; then
+        echo -e "${YELLOW}dailyaidecheck.timer ${NC}: ${GREEN}running${NC}"
+    else
+        echo -e "${YELLOW}dailyaidecheck.timer ${NC}: ${RED}not running${NC}"
+    fi
+
+    command -v sudo &> /dev/null || echo -e "${RED}WARNING: ${YELLOW}sudo ${RED}IS NOT INSTALLED${NC}"
 }
 
 install_package() {
@@ -374,7 +414,7 @@ install_recommended_packages() {
                     install_package "$PKG_MANAGER" "$pkg"
                 done
             fi
-            for pkg in "sudo" "apparmor" "auditd" "aide" "apparmor-profiles" "apparmor-profiles-extra" "apparmor-utils" "audispd-plugins"; do
+            for pkg in "sudo" "apparmor" "apparmor-utils" "auditd" "audispd-plugins" "aide" "apparmor-profiles" "apparmor-profiles-extra"; do
                 install_package "$PKG_MANAGER" "$pkg"
             done
             ;;
@@ -697,12 +737,140 @@ configure_firewall() {
     return 1
 }
 
+# CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
-    return 1
+    command -v auditctl || { echo -e "${RED}Please ensure auditd is installed on your system."; return 1; }
+    if [[ -d /etc/audit/rules.d && ! -f /etc/audit/rules.d/99-hardening.rules ]]; then
+        cat <<- 'EOF' | tee /etc/audit/rules.d/99-hardening.rules
+            # These rules were added by Michael's Linux Hardening Script
+            # These rules are based off ones provided by the CIS Security benchmarks
+
+            # 6.2.3.1/6.3.3.1
+            -w /etc/sudoers -p wa -k scope
+            -w /etc/sudoers.d -p wa -k scope
+
+            # 6.2.3.2/6.3.3.2
+            -a always,exit -F arch=b64 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
+            -a always,exit -F arch=b32 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
+
+            # 6.2.3.3/6.3.3.3
+            -w /var/log/sudo.log -p wa -k sudo_log_file
+
+            # 6.2.3.4/6.3.3.4
+            -a always,exit -F arch=b64 -S adjtimex,settimeofday -k time-change
+            -a always,exit -F arch=b32 -S adjtimex,settimeofday -k time-change
+            -a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -k time-change
+            -a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -k time-change
+            -w /etc/localtime -p wa -k time-change
+
+            # 6.2.3.5/6.3.3.5
+            -a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale
+            -a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale
+            -w /etc/issue -p wa -k system-locale
+            -w /etc/issue.net -p wa -k system-locale
+            -w /etc/hosts -p wa -k system-locale
+            -w /etc/networks -p wa -k system-locale
+            -w /etc/network -p wa -k system-locale
+            -w /etc/netplan -p wa -k system-locale
+            -w /etc/hostname -p wa -k system-locale
+            -w /etc/sysconfig/network -p wa -k system-locale
+            -w /etc/sysconfig/network-scripts/ -p wa -k system-locale
+            -w /etc/NetworkManager -p wa -k system-locale
+
+            # 6.2.3.6/6.3.3.6
+            # Not yet implemented
+
+            # 6.2.3.7/6.3.3.7
+            -a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+            -a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+            -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+            -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+
+            # 6.2.3.8/6.3.3.8
+            -w /etc/group -p wa -k identity
+            -w /etc/passwd -p wa -k identity
+            -w /etc/gshadow -p wa -k identity
+            -w /etc/shadow -p wa -k identity
+            -w /etc/security/opasswd -p wa -k identity
+            -w /etc/nsswitch.conf -p wa -k identity
+            -w /etc/pam.conf -p wa -k identity
+            -w /etc/pam.d -p wa -k identity
+
+            # 6.2.3.9/6.3.3.9
+            -a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+            -a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+            -a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+            -a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+            -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+            -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+
+            # 6.2.3.10/6.3.3.10
+            -a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts
+            -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts
+
+            # 6.2.3.11/6.3.3.11
+            -w /var/run/utmp -p wa -k session
+            -w /var/log/wtmp -p wa -k session
+            -w /var/log/btmp -p wa -k session
+
+            # 6.2.3.12/6.3.3.12
+            -w /var/log/lastlog -p wa -k logins
+            -w /var/run/faillock -p wa -k logins
+
+            # 6.2.3.13/6.3.3.13
+            -a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+            -a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+
+            # 6.2.3.14/6.3.3.14
+            -w /etc/apparmor/ -p wa -k MAC-policy
+            -w /etc/apparmor.d/ -p wa -k MAC-policy
+            -w /etc/selinux -p wa -k MAC-policy
+            -w /usr/share/selinux -p wa -k MAC-policy
+
+            # 6.2.3.15/6.3.3.15
+            -a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+
+            # 6.2.3.16/6.3.3.16
+            -a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+
+            # 6.2.3.17/6.3.3.17
+            -a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+
+            # 6.2.3.18/6.3.3.18
+            -a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k usermod
+
+            # 6.2.3.19/6.3.3.19
+            -a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
+
+            # 6.2.3.20/6.3.3.20
+            -e 2
+EOF
+        augenrules --load
+        augenrules --check
+        systemctl enable --now auditd
+    else
+        echo -e "${RED}Please ensure the directory ${MAGENTA}/etc/audit/rules.d ${RED}exists.${NC}"
+        return 1
+    fi
 }
 
 configure_aide() {
-    return 1
+    command -v aide || { echo -e "${RED}Please ensure AIDE is installed on your system."; return 1; }
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint)
+            aideinit
+            mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+            ;;
+        centos|rocky|almalinux|fedora|rhel|ol)
+            aide --init
+            mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+            ;;
+        *)
+            echo -e "${RED}Unsupported distribution${NC}"
+            return 1
+            ;;
+    esac
+    systemctl enable --now dailyaidecheck.timer
 }
 
 configure_fail2ban() {
@@ -794,6 +962,14 @@ configure_sysctl() {
 
 }
 
+configure_sshd() {
+    return 1
+}
+
+configure_authentication() {
+    return 1
+}
+
 # Will present the main menu
 main() {
     clear
@@ -812,14 +988,14 @@ main() {
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fwconf" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "audit" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "aide" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "audit" "Will initialize auditd rules"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "aide" "Will initialize AIDE (may take awhile)"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "quit" "Quit program"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "exit" "Quit program"
         printf "\n"
         while true; do
             read -rp "Enter an option: "
@@ -899,7 +1075,7 @@ main() {
                     configure_sysctl "disable_ipv6=$option_one"
                     option_one=""
                     ;;
-                quit)
+                exit|quit)
                     exit 0
                     ;;
                 *)
