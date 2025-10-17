@@ -196,6 +196,48 @@ init() {
     fi
 
     command -v sudo &> /dev/null || echo -e "${RED}WARNING: ${YELLOW}sudo ${RED}IS NOT INSTALLED${NC}"
+
+    # Check for duplicate UIDs/GIDs and users/groups, as well as users with passwords
+    mapfile -t DUPLICATE_UIDS < <(
+        awk -F: '{ print $3 }' /etc/passwd | sort | uniq -d
+    )
+    mapfile -t DUPLICATE_GIDS < <(
+        awk -F: '{ print $4 }' /etc/passwd | sort | uniq -d
+    )
+    
+
+    if [[ "${#DUPLICATE_UIDS[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Duplicate UIDs found${NC}"
+        local id=""
+        for id in "${DUPLICATE_UIDS[@]}"; do
+            if [[ "$id" -eq 0 ]]; then
+                echo -e "${RED}WARNING: Duplicate UID 0 account found${NC}"
+                awk -F: -v uid="$id" OFS="," '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
+            else
+                awk -F: -v uid="$id" OFS="," '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
+            fi
+        done
+    elif [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Duplicate GIDs found${NC}"
+        local id=""
+        for id in "${DUPLICATE_GIDS[@]}"; do
+            if [[ "$id" -eq 0 ]]; then
+                echo -e "${RED}WARNING: Duplicate GID 0 account found${NC}"
+                awk -F: -v uid="$id" OFS="," '($4 == uid) { print "User: " $1, " GID: " $4 }' /etc/passwd
+            else
+                awk -F: -v uid="$id" OFS="," '($4 == uid) { print "User: " $1, " GID: " $4 }' /etc/passwd
+            fi
+        done
+    fi
+
+    mapfile -t SHADOW_USERS_REDACT < <(
+        awk -F: -v OFS=":" '($2 != "" && $2 !~ /^[!*]/) { print $1, substr($2, 1, 10) "...", $3, $4, $5, $6, $7, $8, $9 }' /etc/shadow
+    )
+    local user=""
+    echo -e "${YELLOW}Users with password configured in ${CYAN}/etc/shadow: ${NC}"
+    for user in "${SHADOW_USERS_REDACT[@]}"; do
+        echo -e "${BLUE}${user}${NC}"
+    done
 }
 
 install_package() {
