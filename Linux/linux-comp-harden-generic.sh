@@ -748,7 +748,6 @@ init_firewall() {
 
     # Checks should be put in place to see if a table/chain/rule already exists
     if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
-        systemctl enable --now firewalld
         systemctl disable --now nftables &> /dev/null || true
         systemctl disable --now netfilter-persistent &> /dev/null || true
         systemctl disable --now ufw &> /dev/null || true
@@ -758,9 +757,8 @@ init_firewall() {
         firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
         firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
         firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+        systemctl enable --now firewalld
     elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
-        systemctl enable --now ufw
-        ufw enable
         systemctl disable --now nftables &> /dev/null || true
         systemctl disable --now netfilter-persistent &> /dev/null || true
         systemctl disable --now firewalld &> /dev/null || true
@@ -768,6 +766,8 @@ init_firewall() {
         ufw allow out on lo
         ufw deny in from 127.0.0.0/8
         ufw deny in from ::1
+        systemctl enable --now ufw
+        ufw enable
     elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
         systemctl disable --now netfilter-persistent &> /dev/null || true
         systemctl disable --now firewalld &> /dev/null || true
@@ -784,6 +784,7 @@ init_firewall() {
         nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
         nft list ruleset > /etc/nftables.conf
         cp /etc/nftables.conf /etc/sysconfig/nftables.conf
+        systemctl enable --now nftables
     elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
         systemctl disable --now nftables &> /dev/null || true
         systemctl disable --now firewalld  &> /dev/null || true
@@ -808,12 +809,93 @@ init_firewall() {
         ip6tables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
         ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
         ip6tables-save > /etc/iptables/rules.v6
+        systemctl enable --now netfilter-persistent
     fi
 }
 
 # Requires user interaction
 configure_firewall() {
-    return 1
+    if [ ${#FIREWALLS[@]} -eq 0 ]; then
+        echo "Please install a firewall onto the system, then try again."
+        return 1
+    fi
+
+    local -ar service_ports=(
+        ftp:20/tcp
+        ftp:21/tcp
+        ssh:22/tcp
+        smtp:25/tcp
+        dns:53/udp # tcp also exists
+        dhcp:67/udp
+        dhcp-client:68/udp
+        tftp:69/udp
+        http:80/tcp
+        kerberos:88/tcp # udp also exists
+        pop3:110/tcp
+        ntp:123/udp
+        netbios-ns:137/udp
+        netbios-dgm:138/udp
+        netbios-ssn:139/tcp
+        imap:143/tcp
+        snmp:161/udp
+        snmp-tra:162/udp
+        ldap:389/tcp
+        https:443/tcp
+        samba:445/tcp
+        smpts:465/tcp
+        syslog:514/udp
+        dhcp6-client:546/udp
+        dhcp6:547/udp
+        ldaps:636/tcp
+        ftps:990/tcp
+        imaps:993/tcp
+        pops:995/tcp
+        mysql:3306/tcp
+        rdp:3389/tcp # udp also exists
+        vnc:5900/tcp
+    )
+
+    fw_help() {
+        echo -e "No changes will be made to the configuration until you enter \"finalize\""
+        echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
+        echo -e "You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule."
+        echo -e "Example:"
+        echo -e "Enter port/protocol, common name, or a command option: 22 tcp"
+        echo -e "Alternatively, you may enter one of the generic names for a protocol below"
+        echo -e "Example:"
+        echo -e "Enter port/protocol or common name, or a command option: ssh"
+        echo -e "Command options are as follows:"
+        echo -e "${YELLOW} f${NC} : Will ask if you would like to finalize your configuration"
+        echo -e "${YELLOW} e${NC} : Will exit to main menu, without saving any changes"
+        echo -e "${YELLOW} h${NC} : Will show you this prompt again"
+    }
+
+    # Checks should be put in place to see if a table/chain/rule already exists
+    if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+        fw_help
+        echo -e "Configuring ${RED}firewalld${NC}..."
+        echo -e "${YELLOW}If ${RED}firewalld${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
+        read -r
+
+    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
+        fw_help
+        echo -e "Configuring ${RED}ufw${NC}..."
+        echo -e "${YELLOW}If ${RED}ufw${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
+        read -r
+
+    elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
+        fw_help
+        echo -e "Configuring ${RED}nftables${NC}..."
+        echo -e "${YELLOW}If ${RED}nftables${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
+        read -r
+
+    elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
+        fw_help
+        echo -e "Configuring ${RED}iptables${NC}..."
+        echo -e "${YELLOW}If ${RED}iptables${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
+        read -r
+
+    fi
 }
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
@@ -1120,6 +1202,7 @@ main() {
                     init_firewall
                     ;;
                 fwconf)
+                    clear
                     configure_firewall
                     ;;
                 audit)
