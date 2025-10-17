@@ -198,45 +198,82 @@ init() {
     command -v sudo &> /dev/null || echo -e "${RED}WARNING: ${YELLOW}sudo ${RED}IS NOT INSTALLED${NC}"
 
     # Check for duplicate UIDs/GIDs and users/groups, as well as users with passwords
+    # CIS Ubuntu 5.4.2 and 7.2
     mapfile -t DUPLICATE_UIDS < <(
         awk -F: '{ print $3 }' /etc/passwd | sort | uniq -d
     )
-    mapfile -t DUPLICATE_GIDS < <(
+    mapfile -t DUPLICATE_PRIMARY_GIDS < <(
         awk -F: '{ print $4 }' /etc/passwd | sort | uniq -d
     )
-    
+    mapfile -t DUPLICATE_USERNAMES < <(
+        awk -F: '{ print $1 }' /etc/passwd | sort | uniq -d
+    )
+    mapfile -t DUPLICATE_GIDS < <(
+        awk -F: '{ print $3 }' /etc/group | sort | uniq -d
+    )
+    mapfile -t DUPLICATE_GROUP_NAMES < <(
+        awk -F: '{ print $1 }' /etc/group | sort | uniq -d
+    )
 
     if [[ "${#DUPLICATE_UIDS[@]}" -gt 0 ]]; then
         echo -e "${YELLOW}Duplicate UIDs found${NC}"
-        local id=""
-        for id in "${DUPLICATE_UIDS[@]}"; do
-            if [[ "$id" -eq 0 ]]; then
+        local uid=""
+        for uid in "${DUPLICATE_UIDS[@]}"; do
+            if [[ "$uid" -eq 0 ]]; then
                 echo -e "${RED}WARNING: Duplicate UID 0 account found${NC}"
-                awk -F: -v uid="$id" OFS="," '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
-            else
-                awk -F: -v uid="$id" OFS="," '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
             fi
+                awk -F: -v uid="$uid" OFS="|" '($3 == uid) { print "User: " $1, " UID: " $3 }' /etc/passwd
         done
-    elif [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Duplicate GIDs found${NC}"
-        local id=""
-        for id in "${DUPLICATE_GIDS[@]}"; do
-            if [[ "$id" -eq 0 ]]; then
-                echo -e "${RED}WARNING: Duplicate GID 0 account found${NC}"
-                awk -F: -v uid="$id" OFS="," '($4 == uid) { print "User: " $1, " GID: " $4 }' /etc/passwd
-            else
-                awk -F: -v uid="$id" OFS="," '($4 == uid) { print "User: " $1, " GID: " $4 }' /etc/passwd
+    fi
+    if [[ "${#DUPLICATE_PRIMARY_GIDS[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Some users share the same primary GID${NC}"
+        local pgid=""
+        for pgid in "${DUPLICATE_PRIMARY_GIDS[@]}"; do
+            if [[ "$pgid" -eq 0 ]]; then
+                echo -e "${RED}WARNING: Duplicate Primary GID 0 account found${NC}"
             fi
+                awk -F: -v pgid="$pgid" OFS="|" '($4 == pgid) { print "User: " $1, " GID: " $4 }' /etc/passwd
+        done
+    fi
+    if [[ "${#DUPLICATE_USERNAMES[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Duplicate usernames found${NC}"
+        local username=""
+        for username in "${DUPLICATE_USERNAMES[@]}"; do
+            if [[ "$username" = "root" ]]; then
+                echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}account found${NC}"
+            fi
+                awk -F: -v username="$username" OFS=":" '($1 == username) { print $1, $2, $3, $4, $5, $6, $7 }' /etc/passwd
+        done
+    fi
+    if [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Duplicate GIDs found${NC}"
+        local gid=""
+        for gid in "${DUPLICATE_GIDS[@]}"; do
+            if [[ "$gid" -eq 0 ]]; then
+                echo -e "${RED}WARNING: Duplicate GID 0 group found${NC}"
+            fi
+                awk -F: -v gid="$gid" OFS="|" '($3 == gid) { print "Group: " $1, " GID: " $3 }' /etc/group
+        done
+    fi
+    if [[ "${#DUPLICATE_GROUP_NAMES[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Duplicate group names found${NC}"
+        local group_name=""
+        for group_name in "${DUPLICATE_GROUP_NAMES[@]}"; do
+            if [[ "$group_name" = "root" ]]; then
+                echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}group found${NC}"
+            fi
+                awk -F: -v group_name="$group_name" OFS=":" '($1 == group_name) { print $1, $2, $3 }' /etc/passwd
         done
     fi
 
-    mapfile -t SHADOW_USERS_REDACT < <(
+    # This keeps a portion of the password section, just so the user can confirm that the script isnt lying
+    mapfile -t SHADOW_USERS_REDACTED < <(
         awk -F: -v OFS=":" '($2 != "" && $2 !~ /^[!*]/) { print $1, substr($2, 1, 10) "...", $3, $4, $5, $6, $7, $8, $9 }' /etc/shadow
     )
     local user=""
     echo -e "${YELLOW}Users with password configured in ${CYAN}/etc/shadow: ${NC}"
-    for user in "${SHADOW_USERS_REDACT[@]}"; do
-        echo -e "${BLUE}${user}${NC}"
+    for user in "${SHADOW_USERS_REDACTED[@]}"; do
+        echo -e "$user"
     done
 }
 
@@ -1042,16 +1079,16 @@ main() {
         while true; do
             read -rp "Enter an option: "
             case $REPLY in
-                backup)
+                backup|b)
                     backup_directories
                     ;;
-                upgrade)
+                upgrade|u)
                     upgrade_system "$PKG_MANAGER"
                     ;;
-                remove)
+                remove|r)
                     ask_to_remove_packages
                     ;;
-                install)
+                install|i)
                     local option_one=""
                     local option_two=""
                     while true; do
@@ -1117,7 +1154,7 @@ main() {
                     configure_sysctl "disable_ipv6=$option_one"
                     option_one=""
                     ;;
-                exit|quit)
+                exit|quit|q|ex)
                     exit 0
                     ;;
                 *)
