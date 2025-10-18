@@ -43,6 +43,11 @@
 
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
+# TODO: Get helper functions for implementing colors into printf statements
+# TODO: Create error functions
+# TODO: Use printf instead of echo where appropriate
+# TODO: Implement a logging system
+
 set -euo pipefail
 
 # Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
@@ -54,6 +59,10 @@ readonly MAGENTA='\033[0;35m' # For Directories
 readonly CYAN='\033[0;36m' # For Files
 readonly BOLD='\033[1m'
 readonly NC='\033[0m'
+readonly EC="${RED}${BOLD}" # [ERROR]
+readonly WC="${YELLOW}${BOLD}" # [WARN]
+readonly IC="${BLUE}${BOLD}" # [INFO]
+readonly SC="${GREEN}${BOLD}" # [SUCCESS]
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
@@ -64,11 +73,162 @@ fi
 # Set to "true" if you want to ignore the main menu, possibly to run functions directly
 SKIP_MAIN="false"
 
+# Helper function to print status messages
+# print_status "message|not_found" "error|warn|info|success" "..."
+print_status() {
+    local name="$1"
+    shift
+    "prst_${name}" "$@" || printf "%b%s%b\n" "$EC" "Invalid Error" "$NC"
+}
+
+# Generic status message
+# print_status "error|warn|info|success" "text"
+prst_message() {
+    case "$1" in
+        error)
+            printf "%b[ERROR]%b %b%s%b\n" "$EC" "$NC" "$RED" "$2" "$NC"
+            ;;
+        warn)
+            printf "%b[WARN]%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$2" "$NC"
+            ;;
+        info)
+            printf "%b[INFO]%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$2" "$NC"
+            ;;
+        success)
+            printf "%b[SUCCESS]%b %b%s%b\n" "$SC" "$NC" "$SUCCESS" "$2" "$NC"
+            ;;
+    esac
+}
+
+# Not found status message
+# print_status not_found "error|warn" "file|directory|*" "path"
+prst_not_found() {
+    case "$2" in
+        file)
+            case "$1" in
+                error)
+                    printf "%b[ERROR]%b %bfile not found:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "${CYAN}${BOLD}" "$2" "$NC"
+                    ;;
+                warn)
+                    printf "%b[ERROR]%b %bfile not found:%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$NC" "${CYAN}${BOLD}" "$2" "$NC"
+                    ;;
+            esac
+            ;;
+
+        directory)
+            case "$1" in
+                error)
+                    printf "%b[ERROR]%b %bdirectory not found:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "${MAGENTA}${BOLD}" "$2" "$NC"
+                    ;;
+                warn)
+                    printf "%b[WARN]%b %bdirectory not found:%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$NC" "${MAGENTA}${BOLD}" "$2" "$NC"
+                    ;;
+            esac
+            ;;
+
+        *)
+            printf "not found: %s\n" "$2"
+    esac
+}
+
+install_package() {
+    local package_manager="$1"
+    if [[ -z "$package_manager" ]]; then
+        echo "Error: No package manager provided to install_package."
+        return 1
+    fi
+
+    local package_name="$2"
+    if [[ -z "$package_name" ]]; then
+        echo "Error: No package name provided to install_package."
+        return 1
+    fi
+
+    if [[ "$package_manager" == "unsupported" ]]; then
+        echo "Error: Unsupported operating system."
+        return 1
+    fi
+
+    case "$package_manager" in
+        apt)
+            echo "Using apt to install $package_name..."
+            apt install -y "$package_name"
+            ;;
+        dnf)
+            echo "Using dnf to install $package_name..."
+            dnf install -y "$package_name"
+            ;;
+        yum)
+            echo "Using yum to install $package_name..."
+            yum install -y "$package_name"
+            ;;
+        zypper)
+            echo "Using zypper to install $package_name..."
+            zypper install -y "$package_name"
+            ;;
+        pacman)
+            echo "Using pacman to install $package_name..."
+            pacman -Syu --noconfirm "$package_name"
+            ;;
+        *)
+            echo "Error: Unsupported package manager."
+            return 1
+            ;;
+    esac
+}
+
+remove_package() {
+    local package_manager="$1"
+    if [[ -z "$package_manager" ]]; then
+        echo "Error: No package manager provided to remove_package."
+        return 1
+    fi
+
+    local package_name="$2"
+    if [[ -z "$package_name" ]]; then
+        echo "Error: No package name provided to remove_package."
+        return 1
+    fi
+
+    if [[ "$package_manager" == "unsupported" ]]; then
+        echo "Error: Unsupported operating system."
+        return 1
+    fi
+
+    case "$package_manager" in
+        apt)
+            echo "Using apt to remove $package_name..."
+            apt remove "$package_name"
+            ;;
+        dnf)
+            echo "Using dnf to remove $package_name..."
+            dnf remove "$package_name"
+            ;;
+        yum)
+            echo "Using yum to remove $package_name..."
+            yum remove "$package_name"
+            ;;
+        zypper)
+            echo "Using zypper to remove $package_name..."
+            zypper remove "$package_name"
+            ;;
+        pacman)
+            echo "Using pacman to remove $package_name..."
+            pacman -R "$package_name"
+            ;;
+        *)
+            echo "Error: Unsupported package manager."
+            return 1
+            ;;
+    esac
+}
+
 # Sets up global variables, and checks for important system information
 init() {
     # Determine distro being used
     if [ -f /etc/os-release ]; then
         # freedesktop.org
+        # shellcheck disable=SC1091
         . /etc/os-release
         DISTRO=$ID
         VER=$VERSION_ID
@@ -78,6 +238,7 @@ init() {
         VER=$(lsb_release -sr)
     elif [ -f /etc/lsb-release ]; then
         # For some versions of Debian/Ubuntu without lsb_release command
+        # shellcheck disable=SC1091
         . /etc/lsb-release
         DISTRO=$DISTRIB_ID
         VER=$DISTRIB_RELEASE
@@ -286,98 +447,6 @@ init() {
     done
 }
 
-install_package() {
-    local package_manager="$1"
-    if [[ -z "$package_manager" ]]; then
-        echo "Error: No package manager provided to install_package."
-        return 1
-    fi
-
-    local package_name="$2"
-    if [[ -z "$package_name" ]]; then
-        echo "Error: No package name provided to install_package."
-        return 1
-    fi
-
-    if [[ "$package_manager" == "unsupported" ]]; then
-        echo "Error: Unsupported operating system."
-        return 1
-    fi
-
-    case "$package_manager" in
-        apt)
-            echo "Using apt to install $package_name..."
-            apt install -y "$package_name"
-            ;;
-        dnf)
-            echo "Using dnf to install $package_name..."
-            dnf install -y "$package_name"
-            ;;
-        yum)
-            echo "Using yum to install $package_name..."
-            yum install -y "$package_name"
-            ;;
-        zypper)
-            echo "Using zypper to install $package_name..."
-            zypper install -y "$package_name"
-            ;;
-        pacman)
-            echo "Using pacman to install $package_name..."
-            pacman -Syu --noconfirm "$package_name"
-            ;;
-        *)
-            echo "Error: Unsupported package manager."
-            return 1
-            ;;
-    esac
-}
-
-remove_package() {
-    local package_manager="$1"
-    if [[ -z "$package_manager" ]]; then
-        echo "Error: No package manager provided to remove_package."
-        return 1
-    fi
-
-    local package_name="$2"
-    if [[ -z "$package_name" ]]; then
-        echo "Error: No package name provided to remove_package."
-        return 1
-    fi
-
-    if [[ "$package_manager" == "unsupported" ]]; then
-        echo "Error: Unsupported operating system."
-        return 1
-    fi
-
-    case "$package_manager" in
-        apt)
-            echo "Using apt to remove $package_name..."
-            apt remove "$package_name"
-            ;;
-        dnf)
-            echo "Using dnf to remove $package_name..."
-            dnf remove "$package_name"
-            ;;
-        yum)
-            echo "Using yum to remove $package_name..."
-            yum remove "$package_name"
-            ;;
-        zypper)
-            echo "Using zypper to remove $package_name..."
-            zypper remove "$package_name"
-            ;;
-        pacman)
-            echo "Using pacman to remove $package_name..."
-            pacman -R "$package_name"
-            ;;
-        *)
-            echo "Error: Unsupported package manager."
-            return 1
-            ;;
-    esac
-}
-
 upgrade_system() {
     local package_manager="$1"
     if [[ -z "$package_manager" ]]; then
@@ -427,8 +496,9 @@ check_installed_packages() {
             local -ar candidate_pkgs=(
                 autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd dovecot-imapd nfs-kernel-server ypserv cups rpcbind
                 rsync samba snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis rsh-client talk telnet inetutils-telnet
-                ldap-utils ftp tnftp prelink apport gnome netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap proftpd
-                pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
+                ldap-utils ftp tnftp prelink apport gnome gdm3 netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make
+                rsh-server telnetd nmap proftpd pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd vnc-server
+                tightvncserver tigervnc-standalone-server linuxvnc x11vnc
             )
             for pkg in "${candidate_pkgs[@]}"; do
                 dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
@@ -436,9 +506,11 @@ check_installed_packages() {
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
             local -ar candidate_pkgs=(
-                mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups rpcbind rsync-daemon
-                net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp openldap-clients ypbind telnet tftp @graphical-server-environment
-                @workstation-product-environment netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
+                mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups
+                rpcbind rsync-daemon net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp
+                openldap-clients ypbind telnet tftp @graphical-server-environment @workstation-product-environment netcat nmap-ncat
+                wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd tigervnc-server
+                tigervnc-server-minimal
             )
             for pkg in "${candidate_pkgs[@]}"; do
                 rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
@@ -587,160 +659,98 @@ configure_mac() {
     return 1
 }
 
-# CIS Debian 12: 1.4.2, 1.6.4-6, 2.4.1.2-7, 2.4.1.8 (partially), 7.1.1-10, 5.1.1
-# Will be rewritten to use an array of colon-separated pieces of data rather than many if statements
+# CIS Ubuntu and RHEL
+# 6.1.1.2 is for journald and must be done through cp /usr/lib/tmpfiles.d/systemd.conf /etc/tmpfiles.d/systemd.conf, not yet implemented
+# 6.1.3.4/6.2.3.4 is for rsyslog, not yet implemented
+# 6.1.4.1/6.2.4.1 is for /var/log, and must be implemented through a loop, not yet implemented
+# 6.3.4 is for auditd, and is not yet implemented
+# 7.1.11 is world writeable files, which need to not exist or have the sticky bit set
+# 7.1.12 is files with no user/group, which should not exist, or should be assigned a user/group
+# 7.1.13 is ensure SUID and SGID files are reviewed, which is done via linpeas.sh
+# 5.1.1-3 is for ssh, not yet implemented
 configure_permissions() {
-    # 1.4.2
-    if [ -f /etc/grub/grub.cfg ]; then
-        chown root:root /boot/grub/grub.cfg && chmod 0600 /boot/grub/grub.cfg
-    else
-        echo -e "${CYAN}File ${YELLOW}/boot/grub/grub.cfg${RED} Does not exist.${NC}"
+    # Format for the permissions is the following:
+    # path:type:owner:group:mode
+    # In the 2nd field, f is file and d is directory
+    local -a permissions=(
+        "/boot/grub/grub.cfg:f:root:root:0600" # 1.4.2
+        "/etc/motd:f:root:root:0644" # 1.6.4
+        "/etc/issue:f:root:root:0644" # 1.6.5
+        "/etc/issue.net:f:root:root:0644" # 1.6.6
+        "/etc/crontab:f:root:root:0600" # 2.4.1.2
+        "/etc/cron.hourly:d:root:root:0600" # 2.4.1.3
+        "/etc/cron.daily:d:root:root:0600" # 2.4.1.4
+        "/etc/cron.weekly:d:root:root:0600" # 2.4.1.5
+        "/etc/cron.monthly:d:root:root:0600" # 2.4.1.6
+        "/etc/cron.d:d:root:root:0600" # 2.4.1.7
+        "/etc/cron.yearly:d:root:root:0600"
+        "/etc/at.allow:f:root:daemon:0640" # 2.4.2.1
+        "/etc/at.deny:f:root:daemon:0640" # 2.4.2.1
+        "/etc/passwd:f:root:root:0644" # 7.1.1
+        "/etc/passwd-:f:root:root:0644" # 7.1.2
+        "/etc/group:f:root:root:0644" # 7.1.3
+        "/etc/group-:f:root:root:0644" # 7.1.4
+        "/etc/shells:f:root:root:0644" # 7.1.9
+        "/etc/security/opasswd:f:root:root:0600" # 7.1.10
+        "/etc/security/opasswd.old:f:root:root:0600" # 7.1.10
+    )
+    local -ar ubuntu_permissions=(
+        "/etc/cron.allow:f:root:crontab:0640" # 2.4.1.8
+        "/etc/cron.deny:f:root:crontab:0640" # 2.4.1.8
+        "/etc/shadow:f:root:shadow:0640" # 7.1.5
+        "/etc/shadow-:f:root:shadow:0640" # 7.1.6
+        "/etc/gshadow:f:root:shadow:0640" # 7.1.7
+        "/etc/gshadow-:f:root:shadow:0640" # 7.1.8
+    )
+    local -ar rhel_permissions=(
+        "/etc/cron.allow:f:root:root:0640" # 2.4.1.8
+        "/etc/cron.deny:f:root:root:0640" # 2.4.1.8
+        "/etc/shadow:f:root:root:0000" # 7.1.5
+        "/etc/shadow-:f:root:root:0000" # 7.1.6
+        "/etc/gshadow:f:root:root:0000" # 7.1.7
+        "/etc/gshadow-:f:root:root:0000" # 7.1.8
+    )
+
+    if [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|opensuse.*)$ ]]; then
+        permissions+=("${ubuntu_permissions[@]}")
+    elif [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+        permissions+=("${rhel_permissions[@]}")
     fi
 
-    # 1.6.4-6
-    if [ -f /etc/motd ]; then
-        chown root:root /etc/motd && chmod 644 /etc/motd
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/motd${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/issue ]; then
-        chown root:root /etc/issue && chmod 644 /etc/issue
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/issue${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/issue.net ]; then
-        chown root:root /etc/issue.net && chmod 644 /etc/issue.net
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/issue${RED} Does not exist.${NC}"
-    fi
+    local permission path type owner group mode
+    for permission in "${permissions[@]}"; do
+        IFS=':' read -r path type owner group mode <<< "$permission"
+        # Does the file/directory exist?
+        case "$type" in
+            f)
+                if [[ ! -f "$path" ]]; then
+                    print_error not_found file "$path"
+                    permission="" path="" type="" owner="" group="" mode=""
+                    continue
+                fi
+                ;;
+            d)
+                if [[ ! -d "$path" ]]; then
+                    print_error not_found directory "$path"
+                    permission="" path="" type="" owner="" group="" mode=""
+                    continue
+                fi
+                ;;
+            *)
+                print_error error "Type was not f or d."
+                return 1
+                ;;
+        esac
 
-    # 2.4.1.2-7
-    if [ -f /etc/crontab ]; then 
-        chown root:root /etc/crontab && chmod 600 /etc/crontab
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/crontab${RED} Does not exist.${NC}"
-    fi
-    if [ -d /etc/cron.hourly ]; then
-        chown root:root /etc/cron.hourly && chmod 700 /etc/cron.hourly
-    else
-        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
-    fi
-    if [ -d /etc/cron.daily ]; then
-        chown root:root /etc/cron.daily && chmod 700 /etc/cron.daily
-    else
-        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
-    fi
-    if [ -d /etc/cron.weekly ]; then
-        chown root:root /etc/cron.weekly && chmod 700 /etc/cron.weekly
-    else
-        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
-    fi
-    if [ -d /etc/cron.monthly ]; then
-        chown root:root /etc/cron.monthly && chmod 700 /etc/cron.monthly
-    else
-        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.hourly${RED} Does not exist.${NC}"
-    fi
-    if [ -d /etc/cron.d ]; then
-        chown root:root /etc/cron.d && chmod 700 /etc/cron.d
-    else
-        echo -e "${MAGENTA}Directory ${YELLOW}/etc/cron.d${RED} Does not exist.${NC}"
-    fi
-
-    # 2.4.1.8 (partially) (possible issues on systems with crontab group)
-    #[ -f /etc/cron.allow] && chown root:root /etc/cron.allow && chmod 640 /etc/cron.allow
-    #[ -f /etc/cron.deny] && chown root:root /etc/cron.deny && chmod 640 /etc/cron.deny
-
-    # 7.1.1-10
-    if [ -f /etc/passwd ]; then
-        chown root:root /etc/passwd && chmod 644 /etc/passwd
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/passwd${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/passwd- ]; then
-        chown root:root /etc/passwd- && chmod 644 /etc/passwd-
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/passwd-${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/group ]; then
-        chown root:root /etc/group && chmod 644 /etc/group
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/group${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/group- ]; then
-        chown root:root /etc/group- && chmod 644 /etc/group-
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/group-${RED} Does not exist.${NC}"
-    fi
-    case "$DISTRO" in
-        debian|ubuntu)
-            if [ -f /etc/shadow ]; then
-                chown root:shadow /etc/shadow && chmod 640 /etc/shadow
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/shadow${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/shadow- ]; then
-                chown root:shadow /etc/shadow- && chmod 640 /etc/shadow-
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/shadow-${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/gshadow ]; then
-                chown root:shadow /etc/gshadow && chmod 640 /etc/gshadow
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/gshadow${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/gshadow- ]; then
-                chown root:shadow /etc/gshadow- && chmod 640 /etc/gshadow-
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/gshadow-${RED} Does not exist.${NC}"
-            fi
-            ;;
-        centos|rocky|almalinux|fedora|rhel|ol|opensuse*)
-            if [ -f /etc/shadow ]; then
-                chown root:root /etc/shadow && chmod 000 /etc/shadow
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/shadow${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/shadow- ]; then
-                chown root:root /etc/shadow- && chmod 000 /etc/shadow-
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/shadow-${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/gshadow ]; then
-                chown root:root /etc/gshadow && chmod 000 /etc/gshadow
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/gshadow${RED} Does not exist.${NC}"
-            fi
-            if [ -f /etc/gshadow- ]; then
-                chown root:root /etc/gshadow- && chmod 000 /etc/gshadow-
-            else
-                echo -e "${CYAN}File ${YELLOW}/etc/gshadow-${RED} Does not exist.${NC}"
-            fi
-            ;;
-        *)
-            echo "You should configure /etc/shadow and /etc/gshadow yourself."
-            ;;
-    esac
-    if [ -f /etc/shells ]; then
-        chown root:root /etc/shells && chmod 644 /etc/shells
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/shells${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/security/opasswd ]; then
-        chown root:root /etc/security/opasswd && chmod 600 /etc/security/opasswd
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/security/opasswd${RED} Does not exist.${NC}"
-    fi
-    if [ -f /etc/security/opasswd.old ]; then
-        chown root:root /etc/security/opasswd.old && chmod 600 /etc/security/opasswd.old
-    else
-        echo -e "${CYAN}File ${YELLOW}/etc/security/opasswd.old${RED} Does not exist.${NC}"
-    fi
+        chown "${owner}:${group}" "$path" && chmod "$mode" "$path"
+        permission="" path="" type="" owner="" group="" mode=""
+    done
 
     # 5.1.1
     if [ -f /etc/ssh/sshd_config ]; then
         chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
     else
-        echo -e "${CYAN}File ${YELLOW}/etc/security/sshd_config${RED} Does not exist.${NC}"
+        print_error not_found file /etc/ssh/sshd_config
     fi
     if [ -d /etc/ssh/sshd_config.d ]; then
         for file in /etc/ssh/sshd_config.d/*.conf; do
@@ -748,6 +758,11 @@ configure_permissions() {
             chown root:root "$file"
             chmod 600 "$file"
         done
+    fi
+
+    # 5.1.2-3
+    if [ -d /etc/ssh ]; then
+        true
     fi
 }
 
@@ -853,14 +868,14 @@ configure_firewall() {
     fw_help() {
         clear
         echo -e "Command options are as follows:"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow rules"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "s|show" "Will ask if you would like to finalize your configuration"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a rule"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "r|reset" "Will show your currently configured rules"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "f|finalize" "Will reset your rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s|show" "Will ask if you would like to finalize your configuration"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a rule"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will show your currently configured rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will reset your rules"
         echo -e "Long or short names for commands may be used."
         echo -e "You can set the allow rules you would like on the system with the ${YELLOW}a${NC} command"
         echo -e "No changes will be made to the actual firewall configuration until you enter the ${YELLOW}f${NC} command"
@@ -1426,8 +1441,9 @@ configure_authentication() {
 main() {
     clear
     init
-    [[ -f $HOME/.env ]] && source "$HOME/.env" &> /dev/null || \
-        echo -e "${YELLOW}Couldn't find .env file, skipping...${NC}"
+    # shellcheck disable=SC1091
+    [[ -f $HOME/.env ]] && . "$HOME/.env" &> /dev/null || \
+        print_status message info "Couldn't find .env file, skipping..."
     check_installed_packages
     if [[ "${#PACKAGES[@]}" -gt 0 ]]; then
         echo -e "${YELLOW}Possibly unwanted packages were found, run remove/r to determine which you would like to keep, and which to remove${NC}"
@@ -1435,23 +1451,23 @@ main() {
     while true; do
         printf "${GREEN}%s${NC}\n" "Welcome to Michael's Linux Hardening Script (Generic Competition Edition)"
         printf "${GREEN}%s${NC}\n" "Enter the name of an option below:"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "backup" "Will back up \"important directories\""
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "upgrade" "Will upgrade your system"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "remove" "Will ask to remove possibly unnecessary packages"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "install" "Will ask to install possibly helpful packages"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwconf" "(EXPERIMENTAL)" "Will help you configure firewall rules"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "audit" "Will initialize auditd rules"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "aide" "Will initialize AIDE (may take awhile)"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "parts" "Not Yet Implemented"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "init" "Show inital information gathered at beginning of the script"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "exit" "Quit program"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "backup" "Will back up \"important directories\""
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "upgrade" "Will upgrade your system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "remove" "Will ask to remove possibly unnecessary packages"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "install" "Will ask to install possibly helpful packages"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwconf" "(EXPERIMENTAL)" "Will help you configure firewall rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "audit" "Will initialize auditd rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "aide" "Will initialize AIDE (may take awhile)"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "parts" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "init" "Show inital information gathered at beginning of the script"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "exit" "Quit program"
         printf "\n"
         while true; do
             read -rp "Enter an option: "
