@@ -41,11 +41,8 @@
 
 # TODO: auditd autoconfig (6.2), including adding .rules files to /etc/audit/rules.d/ (specified in 6.2.3)
 
-# TODO: aide autoconfig (6.3)
-
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
-# I will add set -euo pipefail to this script, once it becomes important to make it stable and not possibly obliterate your system
 set -euo pipefail
 
 # Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
@@ -572,6 +569,10 @@ backup_directories() {
     echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
 }
 
+backup_firewall() {
+    return 1
+}
+
 # CIS Debian 12: 1.1.2
 # We only want to do /tmp and /dev/shm, any related to /home or /var are out of scope
 configure_partitions() {
@@ -762,68 +763,80 @@ init_firewall() {
 
     # Checks should be put in place to see if a table/chain/rule already exists
     if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
-        systemctl disable --now nftables &> /dev/null || true
-        systemctl disable --now netfilter-persistent &> /dev/null || true
-        systemctl disable --now ufw &> /dev/null || true
-        firewall-cmd --permanent --set-default-zone=public
-        firewall-cmd --permanent --zone=trusted --add-interface=lo
-        firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
-        firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
-        firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
-        firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
-        systemctl enable --now firewalld
+        {
+            systemctl disable --now nftables &> /dev/null || true
+            systemctl disable --now netfilter-persistent &> /dev/null || true
+            systemctl disable --now ufw &> /dev/null || true
+            firewall-cmd --permanent --set-default-zone=public
+            firewall-cmd --permanent --zone=trusted --add-interface=lo
+            firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
+            firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
+            firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+            firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
+            systemctl enable --now firewalld
+            firewall-cmd --reload
+        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
     elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
-        systemctl disable --now nftables &> /dev/null || true
-        systemctl disable --now netfilter-persistent &> /dev/null || true
-        systemctl disable --now firewalld &> /dev/null || true
-        ufw allow in on lo
-        ufw allow out on lo
-        ufw deny in from 127.0.0.0/8
-        ufw deny in from ::1
-        systemctl enable --now ufw
-        ufw enable
+        {
+            systemctl disable --now nftables &> /dev/null || true
+            systemctl disable --now netfilter-persistent &> /dev/null || true
+            systemctl disable --now firewalld &> /dev/null || true
+            ufw allow in on lo
+            ufw allow out on lo
+            ufw deny in from 127.0.0.0/8
+            ufw deny in from ::1
+            systemctl enable --now ufw
+            ufw enable
+        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
     elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
-        systemctl disable --now netfilter-persistent &> /dev/null || true
-        systemctl disable --now firewalld &> /dev/null || true
-        systemctl disable --now ufw &> /dev/null || true
-        nft create table inet filter
-        nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
-        nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
-        nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
-        nft add rule inet filter INPUT iif lo accept
-        nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
-        nft add rule inet filter INPUT ip protocol tcp ct state established accept
-        nft add rule inet filter INPUT ip protocol udp ct state established accept
-        nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
-        nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
-        nft list ruleset > /etc/nftables.conf
-        cp /etc/nftables.conf /etc/sysconfig/nftables.conf
-        systemctl enable --now nftables
+        {
+            systemctl disable --now netfilter-persistent &> /dev/null || true
+            systemctl disable --now firewalld &> /dev/null || true
+            systemctl disable --now ufw &> /dev/null || true
+            nft create table inet filter
+            nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
+            nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
+            nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
+            nft add rule inet filter INPUT iif lo accept
+            nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
+            nft add rule inet filter INPUT ip protocol tcp ct state established accept
+            nft add rule inet filter INPUT ip protocol udp ct state established accept
+            nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
+            nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
+            nft list ruleset > /etc/nftables.conf
+            cp /etc/nftables.conf /etc/sysconfig/nftables.conf
+            systemctl enable --now nftables
+        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
     elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
-        systemctl disable --now nftables &> /dev/null || true
-        systemctl disable --now firewalld  &> /dev/null || true
-        systemctl disable --now ufw &> /dev/null || true
-        iptables -F &> /dev/null || true
-        ip6tables -F &> /dev/null || true
-        iptables -P FORWARD DROP
-        iptables -A INPUT -i lo -j ACCEPT
-        iptables -A OUTPUT -o lo -j ACCEPT
-        iptables -A INPUT -s 127.0.0.0/8 -j DROP
-        iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
-        iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
-        iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
-        iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
-        iptables-save > /etc/iptables/rules.v4
-        ip6tables -P FORWARD DROP
-        ip6tables -A INPUT -i lo -j ACCEPT
-        ip6tables -A OUTPUT -o lo -j ACCEPT
-        ip6tables -A INPUT -s ::1 -j DROP
-        ip6tables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
-        ip6tables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
-        ip6tables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
-        ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
-        ip6tables-save > /etc/iptables/rules.v6
-        systemctl enable --now netfilter-persistent
+        {
+            systemctl disable --now nftables &> /dev/null || true
+            systemctl disable --now firewalld  &> /dev/null || true
+            systemctl disable --now ufw &> /dev/null || true
+            iptables -F &> /dev/null || true
+            ip6tables -F &> /dev/null || true
+            iptables -P FORWARD DROP
+            iptables -A INPUT -i lo -j ACCEPT
+            iptables -A OUTPUT -o lo -j ACCEPT
+            iptables -A INPUT -s 127.0.0.0/8 -j DROP
+            iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+            iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+            iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+            iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
+            iptables-save > /etc/iptables/rules.v4
+            ip6tables -P FORWARD DROP
+            ip6tables -A INPUT -i lo -j ACCEPT
+            ip6tables -A OUTPUT -o lo -j ACCEPT
+            ip6tables -A INPUT -s ::1 -j DROP
+            ip6tables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+            ip6tables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+            ip6tables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+            ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
+            ip6tables-save > /etc/iptables/rules.v6
+            systemctl enable --now netfilter-persistent
+        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
     else
         echo -e "${RED}Unrecognized firewall${NC}"
         return 1
@@ -840,20 +853,22 @@ configure_firewall() {
     fw_help() {
         clear
         echo -e "Command options are as follows:"
-        echo -e "${YELLOW} h${NC} : Will show you this prompt again"
-        echo -e "${YELLOW} q${NC} : Will quit to main menu, without saving any changes"
-        echo -e "${YELLOW} a${NC} : Allows you to append allow rules"
-        echo -e "${YELLOW} f${NC} : Will ask if you would like to finalize your configuration"
-        echo -e "${YELLOW} l${NC} : Will list available service names"
-        echo -e "${YELLOW} s${NC} : Will show your currently configured rules"
-        echo -e "${YELLOW} r${NC} : Will reset your rules"
-        echo -e "You can set the allow rules you would like on the system with the ${YELLOW}e${NC} command"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow rules"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "s|show" "Will ask if you would like to finalize your configuration"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a rule"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "r|reset" "Will show your currently configured rules"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "f|finalize" "Will reset your rules"
+        echo -e "Long or short names for commands may be used."
+        echo -e "You can set the allow rules you would like on the system with the ${YELLOW}a${NC} command"
         echo -e "No changes will be made to the actual firewall configuration until you enter the ${YELLOW}f${NC} command"
         echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
-        echo -e "You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule"
+        echo -e "${YELLOW}You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule${NC}"
         echo -e "Example:"
         echo -e "Enter port/protocol or service name: 22 tcp"
-        echo -e "Alternatively, you may enter one of the generic names for a protocol below"
+        echo -e "${YELLOW}Alternatively, you may enter one of the generic names for a protocol below${NC}"
         echo -e "Example:"
         echo -e "Enter port/protocol or service name: ssh"
     }
@@ -925,7 +940,7 @@ configure_firewall() {
             return 1
         fi
 
-        if [[ "${rulelist[*]}" =~ ^(firewalld|ufw|nftables|iptables)$ ]]; then
+        if [[ "${active_firewall}" =~ ^(firewalld|ufw|nftables|iptables)$ ]]; then
             echo -e "${RED}Unknown firewall."
             return 1
         fi
@@ -940,6 +955,17 @@ configure_firewall() {
             printf "${RED}%s ${NC}" "$rule"
         done
         echo -e ""
+        if [[ "$active_firewall" = "firewalld" ]]; then
+            local interface=""
+            local interfaces
+            mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' | 
+            grep -vE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
+            echo -e "${YELLOW}Interfaces:"
+            for interface in "${interfaces[@]}"; do
+                printf "${YELLOW}%s ${NC}" "$interface"
+            done
+        echo -e ""
+        fi
         echo -e "${RED}Is this information correct? (y/n)?${NC}"
         while true ; do
             read -rp "(y/n): " reply
@@ -949,14 +975,23 @@ configure_firewall() {
                 *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
             esac
         done
+
         clear
         echo -e "${RED}${BOLD}FINAL WARNING: This will write to your firewall configuration if you continue.${NC}"
+        echo -e "${RED}${BOLD}Default policy for input and output will be set to drop after this configuration finishes.${NC}"
         echo -e "Please double check to confirm this information is correct:"
         echo -e "${YELLOW}Firewall: ${RED}${active_firewall}${NC}"
         echo -e "${YELLOW}Inbound Allowed ports:"
         for rule in "${rulelist[@]}"; do
             printf "${RED}%s ${NC}" "$rule"
         done
+        echo -e ""
+        if [[ "$active_firewall" = "firewalld" ]]; then
+            echo -e "${YELLOW}Interfaces:"
+            for interface in "${interfaces[@]}"; do
+                printf "${YELLOW}%s ${NC}" "$interface"
+            done
+        fi
         echo -e ""
         echo -e "${RED}Once more: Is this information correct? (y/n)?"
         while true ; do
@@ -968,7 +1003,101 @@ configure_firewall() {
             esac
         done
         clear
+        local rule
+        local port
+        local protocol
         echo -e "${RED}Applying rules to ${active_firewall}${NC}"
+        # There is no default drop policy for output packets on firewalld, therefore rich rules have to be used
+        if [[ "$active_firewall" = "firewalld" ]]; then
+            mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | grep -v '^docker')
+            {
+                firewall-cmd --new-zone=hardened --permanent
+                firewall-cmd --zone=hardened --set-target=DROP --permanent
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv4 direction="out" drop'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv6 direction="out" drop'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv4 direction="out" port port="443" protocol="tcp" accept'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv4 direction="out" port port="80" protocol="tcp" accept'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv4 direction="out" port port="53" protocol="udp" accept'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv6 direction="out" port port="443" protocol="tcp" accept'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv6 direction="out" port port="80" protocol="tcp" accept'
+                firewall-cmd --zone=hardened --permanent \
+                    --add-rich-rule='rule family=ipv6 direction="out" port port="53" protocol="udp" accept'
+                for rule in "${rulelist[@]}"; do
+                    port=$(echo "$rule"| cut -d "/" -f 1 )
+                    protocol=$(echo "$rule"| cut -d "/" -f 2 )
+                    firewall-cmd --add-port="${port}/${protocol}"
+                done
+            } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
+        elif [[ "$active_firewall" = "ufw" ]]; then
+            {
+                for rule in "${rulelist[@]}"; do
+                    port=$(echo "$rule"| cut -d "/" -f 1 )
+                    protocol=$(echo "$rule"| cut -d "/" -f 2 )
+                    ufw allow in "${port}/${protocol}"
+                done
+                ufw allow out 443/tcp
+                ufw allow out 80/tcp
+                ufw allow out 53/udp
+                ufw default deny incoming '{ policy drop; }'
+                ufw default deny incoming '{ policy drop; }'
+            } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
+        elif [[ "$active_firewall" = "nftables" ]]; then
+            if ! nft list table inet filter &> /dev/null; then
+                printf "${RED}%s${YELLOW}%s${NC}" "table inet filter Not Found, please ensure you ran" "fwconf"
+                return 1
+            fi
+            if ! nft list chain inet filter INPUT &> /dev/null \
+            && ! nft list chain inet filter OUTPUT &> /dev/null \
+            && ! nft list chain inet filter FORWARD &> /dev/null; then
+                printf "${RED}%s${YELLOW}%s${NC}" "Chain for INPUT, OUTPUT, or FORWARD was not found. Please ensure you ran" "fwconf"
+                return 1
+            fi
+
+            {
+                for rule in "${rulelist[@]}"; do
+                    port=$(echo "$rule"| cut -d "/" -f 1 )
+                    protocol=$(echo "$rule"| cut -d "/" -f 2 )
+                    nft add rule inet filter INPUT "$protocol" dport "$port" accept
+                done
+                nft add rule inet filter OUTPUT tcp dport 443 accept
+                nft add rule inet filter OUTPUT tcp dport 80 accept
+                nft add rule inet filter OUTPUT udp dport 53 accept
+                nft chain inet filter INPUT '{ policy drop; }'
+                nft chain inet filter OUTPUT '{ policy drop; }'
+            } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+
+        elif [[ "$active_firewall" = "iptables" ]]; then
+            {
+                for rule in "${rulelist[@]}"; do
+                    port=$(echo "$rule"| cut -d "/" -f 1 )
+                    protocol=$(echo "$rule"| cut -d "/" -f 2 )
+                    iptables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
+                    ip6tables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
+                done
+                iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                ip6tables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                ip6tables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                ip6tables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                iptables -P INPUT DROP
+                iptables -P OUTPUT DROP
+                ip6tables -P INPUT DROP
+                ip6tables -P OUTPUT DROP
+            } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+        else
+            printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+            exit 1
+        fi
     }
 
     # Check firewall being used on the system
@@ -1027,7 +1156,7 @@ configure_firewall() {
     echo -e "Configuring ${RED}${active_firewall}${NC}..."
     echo -e "${GREEN}If ${RED}${active_firewall}${GREEN} is not the correct firewall, please enter ${YELLOW}q${GREEN} below, and ensure other firewalls are not installed.${NC}"
     while true; do
-        read -rp "Enter command (h|q|a|l|s|d|r|f): "
+        read -rp "Enter command (h|q|a|s|l|d|r|f): "
         case "$REPLY" in
             help|h) fw_help ;;
             quit|exit|q|ex) clear ; return 0 ;;
@@ -1315,23 +1444,21 @@ main() {
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "parts" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "init" "Show inital information gathered at beginning of the script"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "exit" "Quit program"
         printf "\n"
         while true; do
             read -rp "Enter an option: "
             case $REPLY in
-                backup|b)
-                    backup_directories
-                    ;;
-                upgrade|u)
-                    upgrade_system "$PKG_MANAGER"
-                    ;;
+                backup|b) backup_directories ;;
+                upgrade|u) upgrade_system "$PKG_MANAGER" ;;
                 remove|r)
                     echo -e "${YELLOW}The following packages of concern were found:${NC}"
                     for pkg in "${PACKAGES[@]}"; do
                         echo -e "${RED}$pkg${NC}"
                     done
                     ask_to_remove_packages
+                    check_installed_packages
                     ;;
                 install|i)
                     local option_one=""
@@ -1358,37 +1485,19 @@ main() {
                     option_one=""
                     option_two=""
                     ;;
-                mac)
-                    configure_mac
-                    ;;
-                fwinit)
-                    init_firewall
-                    ;;
+                mac) configure_mac ;;
+                fwinit) init_firewall ;;
                 fwconf)
                     clear
                     configure_firewall
                     ;;
-                audit)
-                    configure_auditd
-                    ;;
-                aide)
-                    configure_aide
-                    ;;
-                fail)
-                    configure_fail2ban
-                    ;;
-                clam)
-                    configure_clamav
-                    ;;
-                perms)
-                    configure_permissions
-                    ;;
-                parts)
-                    configure_partitions
-                    ;;
-                modules)
-                    disable_kernel_modules
-                    ;;
+                audit) configure_auditd ;;
+                aide) configure_aide ;;
+                fail) configure_fail2ban ;;
+                clam) configure_clamav ;;
+                perms) configure_permissions ;;
+                parts) configure_partitions ;;
+                modules) disable_kernel_modules ;;
                 sysctl)
                     local option_one=""
                     while true; do
@@ -1404,12 +1513,11 @@ main() {
                     option_one=""
                     ;;
                 init)
+                    clear
                     init
                     read -rp "Press enter to continue "
                     ;;
-                exit|quit|q|ex)
-                    exit 0
-                    ;;
+                exit|quit|q|ex) exit 0 ;;
                 *)
                     printf "${RED}%s${NC}\n" "Unrecognized option, try again"
                     REPLY=""
