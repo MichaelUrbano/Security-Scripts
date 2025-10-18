@@ -1435,7 +1435,7 @@ main() {
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "install" "Will ask to install possibly helpful packages"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
-        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fwconf" "Not Yet Implemented"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwconf" "(EXPERIMENTAL)" "Will help you configure firewall rules"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "audit" "Will initialize auditd rules"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "aide" "Will initialize AIDE (may take awhile)"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
