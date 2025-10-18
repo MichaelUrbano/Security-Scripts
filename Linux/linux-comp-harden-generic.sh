@@ -46,7 +46,7 @@
 # TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
 
 # I will add set -euo pipefail to this script, once it becomes important to make it stable and not possibly obliterate your system
-set -uo pipefail
+set -euo pipefail
 
 # Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
 readonly RED='\033[0;31m' # For Warnings
@@ -195,7 +195,7 @@ init() {
         echo -e "${YELLOW}dailyaidecheck.timer ${NC}: ${RED}not running${NC}"
     fi
 
-    command -v sudo &> /dev/null || echo -e "${RED}WARNING: ${YELLOW}sudo ${RED}IS NOT INSTALLED${NC}"
+    command -v sudo &> /dev/null || echo -e "${RED}${BOLD}WARNING: ${NC}${YELLOW}sudo ${RED}${BOLD}IS NOT INSTALLED${NC}"
 
     # Check for duplicate UIDs/GIDs and users/groups, as well as users with passwords
     # CIS Ubuntu 5.4.2 and 7.2
@@ -220,7 +220,7 @@ init() {
         local uid=""
         for uid in "${DUPLICATE_UIDS[@]}"; do
             if [[ "$uid" -eq 0 ]]; then
-                echo -e "${RED}WARNING: Duplicate UID 0 account found${NC}"
+                echo -e "${RED}${BOLD}WARNING: Duplicate UID 0 account found${NC}"
             fi
                 awk -F: -v uid="$uid" '($3 == uid) { print "User:", $1, "| UID:", $3 }' /etc/passwd
         done
@@ -230,7 +230,7 @@ init() {
         local pgid=""
         for pgid in "${DUPLICATE_PRIMARY_GIDS[@]}"; do
             if [[ "$pgid" -eq 0 ]]; then
-                echo -e "${RED}WARNING: Duplicate Primary GID 0 account found${NC}"
+                echo -e "${RED}${BOLD}WARNING: Duplicate Primary GID 0 account found${NC}"
             fi
                 awk -F: -v pgid="$pgid" '($4 == pgid) { print "User:", $1, "| GID:", $4 }' /etc/passwd
         done
@@ -240,7 +240,7 @@ init() {
         local username=""
         for username in "${DUPLICATE_USERNAMES[@]}"; do
             if [[ "$username" = "root" ]]; then
-                echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}account found${NC}"
+                echo -e "${RED}${BOLD}WARNING: Duplicate ${YELLOW}root ${RED}account found${NC}"
             fi
                 awk -F: -v username="$username" '($1 == username) { print $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ":" $7 }' /etc/passwd
         done
@@ -250,7 +250,7 @@ init() {
         local gid=""
         for gid in "${DUPLICATE_GIDS[@]}"; do
             if [[ "$gid" -eq 0 ]]; then
-                echo -e "${RED}WARNING: Duplicate GID 0 group found${NC}"
+                echo -e "${RED}${BOLD}WARNING: Duplicate GID 0 group found${NC}"
             fi
                 awk -F: -v gid="$gid" '($3 == gid) { print "Group:", $1, "| GID:", $3 }' /etc/group
         done
@@ -260,10 +260,22 @@ init() {
         local group_name=""
         for group_name in "${DUPLICATE_GROUP_NAMES[@]}"; do
             if [[ "$group_name" = "root" ]]; then
-                echo -e "${RED}WARNING: Duplicate ${YELLOW}root ${RED}group found${NC}"
+                echo -e "${RED}${BOLD}WARNING: Duplicate ${YELLOW}root ${RED}group found${NC}"
             fi
                 awk -F: -v group_name="$group_name" '($1 == group_name) { print $1 ":" $2 ":" $3 }' /etc/group
         done
+    fi
+
+    # Checks if users are in the shadow group
+    # This needs to check the /etc/group file as well, currently doesn't do that
+    # Also needs to warn the user, doesn't do that currently
+    if [[ "$DISTRO" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+        SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
+        echo -e "${GREEN}shadow GID: ${YELLOW}${SHADOW_GID}${NC}"
+        mapfile -t SHADOW_PGID < <(
+            awk -F: -v SHADOW_GID="$SHADOW_GID" '($3 == SHADOW_GID) { print $1 }' /etc/passwd
+        )
+
     fi
 
     # This keeps a portion of the password section, just so the user can confirm that the script isnt lying
@@ -422,7 +434,7 @@ check_installed_packages() {
                 pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd
             )
             for pkg in "${candidate_pkgs[@]}"; do
-                dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg")
+                dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
             done
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
@@ -432,17 +444,14 @@ check_installed_packages() {
                 @workstation-product-environment netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd
             )
             for pkg in "${candidate_pkgs[@]}"; do
-                rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg")
+                rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
             done
             ;;
         *)
-            echo "You must manually check, sorry."
+            echo "Package manager not recognized, installed packages must be manually checked."
+            return 1
             ;;
     esac
-    echo -e "${YELLOW}The following packages of concern were found:${NC}"
-    for pkg in "${PACKAGES[@]}"; do
-        echo -e "${RED}$pkg${NC}"
-    done
 }
 
 # Debian 2.1 & 2.2
@@ -564,11 +573,16 @@ backup_directories() {
 }
 
 # CIS Debian 12: 1.1.2
+# We only want to do /tmp and /dev/shm, any related to /home or /var are out of scope
 configure_partitions() {
+    #echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
+    #echo "tmpfs /dev/shm tmpfs defaults,nosuid,nodev,noexec 0 0" >> /etc/fstab
     return 1
 }
 
 configure_mac() {
+    case "$DISTRO" in
+    esac
     return 1
 }
 
@@ -810,27 +824,179 @@ init_firewall() {
         ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
         ip6tables-save > /etc/iptables/rules.v6
         systemctl enable --now netfilter-persistent
+    else
+        echo -e "${RED}Unrecognized firewall${NC}"
+        return 1
     fi
 }
 
-# Requires user interaction
+# User interactive function
 configure_firewall() {
     if [ ${#FIREWALLS[@]} -eq 0 ]; then
         echo "Please install a firewall onto the system, then try again."
         return 1
     fi
 
+    fw_help() {
+        clear
+        echo -e "Command options are as follows:"
+        echo -e "${YELLOW} h${NC} : Will show you this prompt again"
+        echo -e "${YELLOW} q${NC} : Will quit to main menu, without saving any changes"
+        echo -e "${YELLOW} a${NC} : Allows you to append allow rules"
+        echo -e "${YELLOW} f${NC} : Will ask if you would like to finalize your configuration"
+        echo -e "${YELLOW} l${NC} : Will list available service names"
+        echo -e "${YELLOW} s${NC} : Will show your currently configured rules"
+        echo -e "${YELLOW} r${NC} : Will reset your rules"
+        echo -e "You can set the allow rules you would like on the system with the ${YELLOW}e${NC} command"
+        echo -e "No changes will be made to the actual firewall configuration until you enter the ${YELLOW}f${NC} command"
+        echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
+        echo -e "You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule"
+        echo -e "Example:"
+        echo -e "Enter port/protocol or service name: 22 tcp"
+        echo -e "Alternatively, you may enter one of the generic names for a protocol below"
+        echo -e "Example:"
+        echo -e "Enter port/protocol or service name: ssh"
+    }
+
+    fw_add_rules() {
+        local service="" protocol="" valid_port="false" valid_name="false" append="" rule=""
+        while true; do
+            read -rp "Enter port/protocol or service name (q to exit): " service protocol
+            # For verifying that given input is valid
+            if [[ "$service" =~ ^[0-9]+$ ]]; then # Is input only numbers?
+                if (( service >= 1 && service <= 65535 )); then # Is input a valid port number?
+                    if [[ "$protocol" =~ ^(tcp|udp)$ ]]; then # Did they specify a valid protocol?
+                        valid_port="true"
+                        append="${service}/${protocol}"
+                    fi
+                fi
+            elif [[ "$service" =~ ^[a-z\-]+[a-z0-9]$ ]]; then # Is input letters/dashes, ending with a letter or 1 digit? (ex: "pop3" and "ssh" will match, but not "prot42")
+                local service_name=""
+                local attempted_service=""
+                for service_name in "${service_ports[@]}"; do # Does the input service exist in the array?
+                    attempted_service=$(echo "$service_name"| cut -d ":" -f 1)
+                    if [[ "$attempted_service" = "$service" ]]; then
+                        valid_name="true"
+                        append=$(echo "$service_name"| cut -d ":" -f 2)
+                    fi
+                done
+            elif [[ "$service" = "q" ]]; then # did they type q to exit?
+                return 0
+            else
+                echo -e "${RED}Invalid input${NC}"
+                service=""
+                protocol=""
+                valid_port="false"
+                valid_name="false"
+                append=""
+                continue
+            fi
+
+            for rule in "${rulelist[@]}"; do
+                if [[ "$rule" = "$append" ]]; then
+                    echo -e "${RED}Rule already exists.${NC}"
+                    service=""
+                    protocol=""
+                    valid_port="false"
+                    valid_name="false"
+                    append=""
+                    continue 2
+                fi
+            done
+
+            # Could be improved, lots of repeated logic
+            if [[ "$valid_port" = "true" || "$valid_name" = "true" ]]; then
+                mapfile -t -O "${#rulelist[@]}" rulelist < <(echo "$append")
+                echo -e "Added rule ${YELLOW}${append}${NC} to rulelist"
+            else
+                echo -e "${RED}Invalid input${NC}"
+            fi
+            service="" protocol="" valid_port="false" valid_name="false" append=""
+        done
+    }
+
+    fw_delete_rules() {
+        return 0
+    }
+
+    fw_finalize_rules() {
+        if [[ "${#rulelist[@]}" -le 0 ]]; then
+            echo -e "${RED}Rulelist is empty, add rules, then try again."
+            return 1
+        fi
+
+        if [[ "${rulelist[*]}" =~ ^(firewalld|ufw|nftables|iptables)$ ]]; then
+            echo -e "${RED}Unknown firewall."
+            return 1
+        fi
+
+        clear
+        local rule=""
+        local reply=""
+        echo -e "Please confirm this information is correct:"
+        echo -e "${YELLOW}Firewall: ${RED}${active_firewall}${NC}"
+        echo -e "${YELLOW}Inbound Allowed ports:"
+        for rule in "${rulelist[@]}"; do
+            printf "${RED}%s ${NC}" "$rule"
+        done
+        echo -e ""
+        echo -e "${RED}Is this information correct? (y/n)?${NC}"
+        while true ; do
+            read -rp "(y/n): " reply
+            case $reply in
+                y) reply="" && break ;;
+                n) echo -e "${RED}Bringing you back to the menu...${NC}" ; return 0 ;;
+                *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
+            esac
+        done
+        clear
+        echo -e "${RED}${BOLD}FINAL WARNING: This will write to your firewall configuration if you continue.${NC}"
+        echo -e "Please double check to confirm this information is correct:"
+        echo -e "${YELLOW}Firewall: ${RED}${active_firewall}${NC}"
+        echo -e "${YELLOW}Inbound Allowed ports:"
+        for rule in "${rulelist[@]}"; do
+            printf "${RED}%s ${NC}" "$rule"
+        done
+        echo -e ""
+        echo -e "${RED}Once more: Is this information correct? (y/n)?"
+        while true ; do
+            read -rp "(y/n): " reply
+            case $reply in
+                y) reply="" && break ;;
+                n) echo -e "${RED}Bringing you back to the menu...${NC}" ; return 0 ;;
+                *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
+            esac
+        done
+        clear
+        echo -e "${RED}Applying rules to ${active_firewall}${NC}"
+    }
+
+    # Check firewall being used on the system
+    local active_firewall=""
+    if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+        active_firewall="firewalld"
+    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian|linuxmint)$ ]]; then
+        active_firewall="ufw"
+    elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
+        active_firewall="nftables"
+    elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
+        active_firewall="iptables"
+    else
+        echo -e "${RED}Unrecognized firewall.${NC}"
+        return 0
+    fi
+
     local -ar service_ports=(
-        ftp:20/tcp
+        ftp-data:20/tcp
         ftp:21/tcp
         ssh:22/tcp
         smtp:25/tcp
-        dns:53/udp # tcp also exists
+        dns:53/udp # tcp also valid
         dhcp:67/udp
         dhcp-client:68/udp
         tftp:69/udp
         http:80/tcp
-        kerberos:88/tcp # udp also exists
+        kerberos:88/tcp # udp also valid
         pop3:110/tcp
         ntp:123/udp
         netbios-ns:137/udp
@@ -838,15 +1004,16 @@ configure_firewall() {
         netbios-ssn:139/tcp
         imap:143/tcp
         snmp:161/udp
-        snmp-tra:162/udp
-        ldap:389/tcp
-        https:443/tcp
+        snmp-trap:162/udp
+        ldap:389/tcp # udp also valid
+        https:443/tcp # udp also valid
         samba:445/tcp
         smpts:465/tcp
         syslog:514/udp
-        dhcp6-client:546/udp
-        dhcp6:547/udp
-        ldaps:636/tcp
+        dhcpv6-client:546/udp
+        dhcpv6:547/udp
+        ldaps:636/tcp # udp also valid
+        ftps-data:989/tcp
         ftps:990/tcp
         imaps:993/tcp
         pops:995/tcp
@@ -855,47 +1022,36 @@ configure_firewall() {
         vnc:5900/tcp
     )
 
-    fw_help() {
-        echo -e "No changes will be made to the configuration until you enter \"finalize\""
-        echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
-        echo -e "You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule."
-        echo -e "Example:"
-        echo -e "Enter port/protocol, common name, or a command option: 22 tcp"
-        echo -e "Alternatively, you may enter one of the generic names for a protocol below"
-        echo -e "Example:"
-        echo -e "Enter port/protocol or common name, or a command option: ssh"
-        echo -e "Command options are as follows:"
-        echo -e "${YELLOW} f${NC} : Will ask if you would like to finalize your configuration"
-        echo -e "${YELLOW} e${NC} : Will exit to main menu, without saving any changes"
-        echo -e "${YELLOW} h${NC} : Will show you this prompt again"
-    }
-
-    # Checks should be put in place to see if a table/chain/rule already exists
-    if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
-        fw_help
-        echo -e "Configuring ${RED}firewalld${NC}..."
-        echo -e "${YELLOW}If ${RED}firewalld${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
-        read -r
-
-    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
-        fw_help
-        echo -e "Configuring ${RED}ufw${NC}..."
-        echo -e "${YELLOW}If ${RED}ufw${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
-        read -r
-
-    elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
-        fw_help
-        echo -e "Configuring ${RED}nftables${NC}..."
-        echo -e "${YELLOW}If ${RED}nftables${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
-        read -r
-
-    elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
-        fw_help
-        echo -e "Configuring ${RED}iptables${NC}..."
-        echo -e "${YELLOW}If ${RED}iptables${YELLOW} is not the correct firewall, please enter n below, and ensure other firewalls are not installed."
-        read -r
-
-    fi
+    local rulelist=()
+    fw_help
+    echo -e "Configuring ${RED}${active_firewall}${NC}..."
+    echo -e "${GREEN}If ${RED}${active_firewall}${GREEN} is not the correct firewall, please enter ${YELLOW}q${GREEN} below, and ensure other firewalls are not installed.${NC}"
+    while true; do
+        read -rp "Enter command (h|q|a|l|s|d|r|f): "
+        case "$REPLY" in
+            help|h) fw_help ;;
+            quit|exit|q|ex) clear ; return 0 ;;
+            append|a) fw_add_rules ; clear ;;
+            list|l)
+                local service=""
+                for service in "${service_ports[@]}"; do
+                    echo -ne "${YELLOW}${service}${NC} "
+                done
+                echo -e ""
+                ;;
+            show|s)
+                local rule=""
+                for rule in "${rulelist[@]}"; do
+                    echo -ne "${YELLOW}${rule}${NC} "
+                done
+                echo -e ""
+                ;;
+            delete|d) fw_delete_rules ;;
+            reset|r) rulelist=() ; echo -e "${YELLOW}Reset rulelist${NC}" ;;
+            finalize|f) fw_finalize_rules ;;
+            *) echo -e "${RED}Unrecognized option${NC}" ; REPLY="" ;;
+        esac
+    done
 }
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
@@ -1136,10 +1292,12 @@ main() {
     clear
     init
     [[ -f $HOME/.env ]] && source "$HOME/.env" &> /dev/null || \
-        echo -e "${YELLOW}Couldn't find .env file${NC}"
+        echo -e "${YELLOW}Couldn't find .env file, skipping...${NC}"
     check_installed_packages
+    if [[ "${#PACKAGES[@]}" -gt 0 ]]; then
+        echo -e "${YELLOW}Possibly unwanted packages were found, run remove/r to determine which you would like to keep, and which to remove${NC}"
+    fi
     while true; do
-        printf "\n"
         printf "${GREEN}%s${NC}\n" "Welcome to Michael's Linux Hardening Script (Generic Competition Edition)"
         printf "${GREEN}%s${NC}\n" "Enter the name of an option below:"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "backup" "Will back up \"important directories\""
@@ -1154,6 +1312,7 @@ main() {
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
+        printf "${BOLD}${YELLOW}%-10s${NC} :\t ${RED}%s${NC}\n" "parts" "Not Yet Implemented"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
         printf "${BOLD}${YELLOW}%-10s${NC} :\t %s\n" "exit" "Quit program"
@@ -1168,6 +1327,10 @@ main() {
                     upgrade_system "$PKG_MANAGER"
                     ;;
                 remove|r)
+                    echo -e "${YELLOW}The following packages of concern were found:${NC}"
+                    for pkg in "${PACKAGES[@]}"; do
+                        echo -e "${RED}$pkg${NC}"
+                    done
                     ask_to_remove_packages
                     ;;
                 install|i)
@@ -1220,6 +1383,9 @@ main() {
                 perms)
                     configure_permissions
                     ;;
+                parts)
+                    configure_partitions
+                    ;;
                 modules)
                     disable_kernel_modules
                     ;;
@@ -1237,6 +1403,10 @@ main() {
                     configure_sysctl "disable_ipv6=$option_one"
                     option_one=""
                     ;;
+                init)
+                    init
+                    read -rp "Press enter to continue "
+                    ;;
                 exit|quit|q|ex)
                     exit 0
                     ;;
@@ -1248,6 +1418,7 @@ main() {
             esac
 
             REPLY=""
+            clear
             break
         done
     done
