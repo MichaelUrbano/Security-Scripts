@@ -1408,6 +1408,12 @@ configure_sysctl() {
 
 }
 
+# GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" (RHEL)
+# GRUB_CMDLINE_LINUX="audit=1 audit_backlog_limit=8192" (RHEL)
+configure_grub() {
+    return 1
+}
+
 configure_sshd() {
     return 1
 }
