@@ -51,14 +51,14 @@
 set -euo pipefail
 
 # Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
-readonly RED='\033[0;31m' # For Warnings
-readonly GREEN='\033[0;32m' # For "All Clear"
-readonly YELLOW='\033[0;33m' # For Commands or Options
-readonly BLUE='\033[0;34m' # For Info
+readonly RED='\033[0;31m' # For ERROR or Firewalls
+readonly GREEN='\033[0;32m' # For SUCCESS
+readonly YELLOW='\033[0;33m' # For WARN, Commands, or Options
+readonly BLUE='\033[0;34m' # For INFO
 readonly MAGENTA='\033[0;35m' # For Directories
 readonly CYAN='\033[0;36m' # For Files
-readonly BOLD='\033[1m'
-readonly NC='\033[0m'
+readonly BOLD='\033[1m' # At your own discretion
+readonly NC='\033[0m' # Clears colors/bolding
 readonly EC="${RED}${BOLD}" # [ERROR]
 readonly WC="${YELLOW}${BOLD}" # [WARN]
 readonly IC="${BLUE}${BOLD}" # [INFO]
@@ -66,12 +66,16 @@ readonly SC="${GREEN}${BOLD}" # [SUCCESS]
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${BLUE}This script must be run as ${RED}root${BLUE}, or with sudo.${NC}" >&2
+    echo -e "${YELLOW}This script must be run as ${RED}${BOLD}root${NC}${YELLOW}, or with ${RED}${BOLD}sudo.${NC}" >&2
     exit 1
 fi
 
 # Set to "true" if you want to ignore the main menu, possibly to run functions directly
 SKIP_MAIN="false"
+
+# Silently import .env before init even can, in case user set SKIP_MAIN="true"
+
+. "$HOME/.env" &> /dev/null
 
 # Helper function to print status messages
 # print_status "message|not_found" "error|warn|info|success" "..."
@@ -96,6 +100,34 @@ prst_message() {
             ;;
         success)
             printf "%b[SUCCESS]%b %b%s%b\n" "$SC" "$NC" "$SUCCESS" "$2" "$NC"
+            ;;
+    esac
+}
+
+# prst_message with a few quirks
+# Intended as a temporary, hacky workaround solution while other coding tasks are prioritized
+# You give it the first portion of the string that you would normally print
+# The second argument should be the rest of the string that you would like to print, though you cannot, since it is with a different color
+# The two strings will then be combined for logging purposes (once logging is implemented)
+# It has no newline character, so from there you would use printf to change the color of the following text
+# Useful for when you may need to use custom colors after a status message, for things like file or directory names
+# Example w/ printf afterwards:
+# print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
+# printf "%b%s%b and %b%s%b\n" "$CYAN" "/etc/nftables.conf" "$NC" "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
+# print_status message_alt "error|warn|info|success" "partial printed text" "logged text"
+prst_message_alt() {
+    case "$1" in
+        error)
+            printf "%b[ERROR]%b %b%s%b" "$EC" "$NC" "$RED" "$2" "$NC"
+            ;;
+        warn)
+            printf "%b[WARN]%b %b%s%b" "$WC" "$NC" "$YELLOW" "$2" "$NC"
+            ;;
+        info)
+            printf "%b[INFO]%b %b%s%b" "$IC" "$NC" "$BLUE" "$2" "$NC"
+            ;;
+        success)
+            printf "%b[SUCCESS]%b %b%s%b" "$SC" "$NC" "$SUCCESS" "$2" "$NC"
             ;;
     esac
 }
@@ -128,6 +160,36 @@ prst_not_found() {
 
         *)
             printf "not found: %s\n" "$2"
+    esac
+}
+
+# Invalid input status message
+# print_status invalid_input "error|info" "input"
+prst_invalid_input() {
+    case "$1" in
+        error)
+            printf "%b[ERROR]%b %bInvalid input:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "$RED" "$2" "$NC"
+            ;;
+        info)
+            printf "%b[INFO]%b %bInvalid input:%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$NC" "$BLUE" "$2" "$NC"
+            ;;
+        *)
+            printf "Invalid input: %s\n" "$2"
+    esac
+}
+
+# Unrecognized option status message
+# print_status unrecognized_option "error|info" "input"
+prst_unrecognized_option() {
+    case "$1" in
+        error)
+            printf "%b[ERROR]%b %bUnrecognized option:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "$RED" "$2" "$NC"
+            ;;
+        info)
+            printf "%b[INFO]%b %bUnrecognized option:%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$NC" "$BLUE" "$2" "$NC"
+            ;;
+        *)
+            printf "Unrecognized option: %s\n" "$2"
     esac
 }
 
@@ -223,12 +285,12 @@ remove_package() {
     esac
 }
 
-# Sets up global variables, and checks for important system information
+# Checks system information and sets up global variables needed for functions
 init() {
     # Determine distro being used
     if [ -f /etc/os-release ]; then
         # freedesktop.org
-        # shellcheck disable=SC1091
+        
         . /etc/os-release
         DISTRO=$ID
         VER=$VERSION_ID
@@ -238,7 +300,7 @@ init() {
         VER=$(lsb_release -sr)
     elif [ -f /etc/lsb-release ]; then
         # For some versions of Debian/Ubuntu without lsb_release command
-        # shellcheck disable=SC1091
+        
         . /etc/lsb-release
         DISTRO=$DISTRIB_ID
         VER=$DISTRIB_RELEASE
@@ -287,6 +349,7 @@ init() {
 
     # Find firewalls installed on the system
     FIREWALLS=()
+    declare -gA FW_BACKUPS=()
     local firewall=""
 
     # firewalld
@@ -603,7 +666,7 @@ install_recommended_packages() {
 backup_directories() {
     local backup_directory="${BAKDIR:-/usr/sbin}"
     if [ ! -d "$backup_directory" ]; then
-        echo -e "${RED}Backup directory does not exist${NC}"
+        print_status message error "Backup directory does not exist"
         return 1
     fi
     local backup_path="${backup_directory}/b4"
@@ -641,8 +704,129 @@ backup_directories() {
     echo -e "Done. You can find your backups at ${YELLOW}${backup_path}${NC}"
 }
 
+# Performs a backup of given firewall, putting the backups into /srv/backups
+# It also inserts into the associative array FW_BACKUPS, 
+# containing the path of each backup as the key, and the name of the original file as the value
+# These are meant to be more of a "rollback" than an entire backup
+# They aren't very well protected in comparison to backups by backup_directories
+# May serve as a good IoC if these files suddenly vanish
+# backup_firewall "firewalld|ufw|nftables|iptables" "backup_name"
 backup_firewall() {
-    return 1
+    mkdir -p /srv/backups
+    FW_BACKUPS=()
+    case "$1" in
+        firewalld)
+            local backup_name
+            local zone
+            local -a zones
+            if [[ -d /etc/firewalld/zones ]]; then
+                {
+                    mapfile -t zones < <(ls /etc/firewalld/zones)
+                    for zone in "${zones[@]}"; do
+                        backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-${zone}"
+                        cp "/etc/firewalld/zones/${zone}" "$backup_name" && chmod 0600 "$backup_name"
+                        FW_BACKUPS["$backup_name"]="/etc/firewalld/zones/${zone}"
+                    done
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status not_found warn directory "/etc/firewalld/zones"
+            fi
+
+            return 0
+            ;;
+        ufw)
+            local backup_name
+            if [[ -f /etc/ufw/user.rules ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-user.rules"
+                    cp "/etc/ufw/user.rules" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/ufw/user.rules"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status not_found warn file "/etc/ufw/user.rules"
+            fi
+
+            if [[ -f /etc/ufw/user6.rules ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-user6.rules"
+                    cp "/etc/ufw/user6.rules" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/ufw/user6.rules"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status not_found warn file "/etc/ufw/user6.rules"
+            fi
+
+            return 0
+            ;;
+        nftables)
+            local backup_name
+            if [[ -f "/etc/nftables.conf" ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-nftables.conf"
+                    cp "/etc/nftables.conf" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/nftables.conf"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            elif [[ -f "/etc/sysconfig/nftables.conf" ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-nftables.conf"
+                    cp "/etc/sysconfig/nftables.conf" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/sysconfig/nftables.conf"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status message warn "No files found for firewall backup"
+            fi
+
+            return 0
+            ;;
+        iptables)
+            local backup_name
+            if [[ -f "/etc/iptables/rules.v4" ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-rules.v4"
+                    cp "/etc/iptables/rules.v4" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/iptables/rules.v4"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status not_found warn file "/etc/iptables/rules.v4"
+            fi
+
+            if [[ -f "/etc/iptables/rules.v6" ]]; then
+                {
+                    backup_name="/srv/backups/${2}-$(date +%b-%d-%H.%M.%S)-rules.v6"
+                    cp "/etc/iptables/rules.v6" "$backup_name"
+                    FW_BACKUPS["$backup_name"]="/etc/iptables/rules.v6"
+                } || { print_status message error "Firewall backup failed"; return 1; }
+            else
+                print_status not_found warn file "/etc/iptables/rules.v6"
+            fi
+
+            return 0
+            ;;
+        *)
+            print_status message error "Unrecognized firewall"
+            return 1
+            ;;
+    esac
+}
+
+restore_firewall() {
+    if [[ ! -d "/srv/backups" ]]; then
+        print_status not_found error directory "/srv/backups"
+        return 1
+    fi
+
+    if [[ "${#FW_BACKUPS[@]}" -le 0 ]]; then
+        print_status message error "No backups listed"
+        return 1
+    fi
+
+    local path
+    for path in "${!FW_BACKUPS[@]}"; do
+        cp "$path" "${FW_BACKUPS["$path"]}" || {
+            print_status message error "Failed to restore $path"
+            return 1
+        }
+    done
 }
 
 # CIS Debian 12: 1.1.2
@@ -655,6 +839,9 @@ configure_partitions() {
 
 configure_mac() {
     case "$DISTRO" in
+        ubuntu|debian|linuxmint|opensuse*)
+            ;;
+        
     esac
     return 1
 }
@@ -724,14 +911,14 @@ configure_permissions() {
         case "$type" in
             f)
                 if [[ ! -f "$path" ]]; then
-                    print_error not_found file "$path"
+                    print_error not_found warn file "$path"
                     permission="" path="" type="" owner="" group="" mode=""
                     continue
                 fi
                 ;;
             d)
                 if [[ ! -d "$path" ]]; then
-                    print_error not_found directory "$path"
+                    print_error not_found warn directory "$path"
                     permission="" path="" type="" owner="" group="" mode=""
                     continue
                 fi
@@ -750,7 +937,7 @@ configure_permissions() {
     if [ -f /etc/ssh/sshd_config ]; then
         chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
     else
-        print_error not_found file /etc/ssh/sshd_config
+        print_error not_found warn file /etc/ssh/sshd_config
     fi
     if [ -d /etc/ssh/sshd_config.d ]; then
         for file in /etc/ssh/sshd_config.d/*.conf; do
@@ -772,13 +959,15 @@ configure_permissions() {
 init_firewall() {
     # CIS Debian 12: 4.1
     if [ ${#FIREWALLS[@]} -eq 0 ]; then
-        echo "Please install a firewall onto the system, then try again."
+        print_status message error "Please install a firewall onto the system, then try again."
         return 1
     fi
 
     # Checks should be put in place to see if a table/chain/rule already exists
     if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
         {
+            print_status message info "Backing up configuration (if it exists)..."
+            backup_firewall firewalld init
             systemctl disable --now nftables &> /dev/null || true
             systemctl disable --now netfilter-persistent &> /dev/null || true
             systemctl disable --now ufw &> /dev/null || true
@@ -790,10 +979,12 @@ init_firewall() {
             firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
             systemctl enable --now firewalld
             firewall-cmd --reload
-        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+        } || { print_status message error "Something went wrong, exiting..." ; return 1; }
 
     elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
         {
+            print_status message info "Backing up configuration (if it exists)..."
+            backup_firewall ufw init
             systemctl disable --now nftables &> /dev/null || true
             systemctl disable --now netfilter-persistent &> /dev/null || true
             systemctl disable --now firewalld &> /dev/null || true
@@ -802,36 +993,46 @@ init_firewall() {
             ufw deny in from 127.0.0.0/8
             ufw deny in from ::1
             systemctl enable --now ufw
-            ufw enable
-        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+            yes | ufw enable
+        } || { print_status message error "Something went wrong, exiting..." ; return 1; }
 
     elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
         {
+            print_status message info "Backing up configuration (if it exists)..."
+            backup_firewall nftables init
             systemctl disable --now netfilter-persistent &> /dev/null || true
             systemctl disable --now firewalld &> /dev/null || true
             systemctl disable --now ufw &> /dev/null || true
-            nft create table inet filter
-            nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
-            nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
-            nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
+            nft list table inet filter &>/dev/null || nft create table inet filter
+            nft list chain inet filter INPUT &> /dev/null || nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
+            nft list chain inet filter FORWARD &> /dev/null || nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
+            nft list chain inet filter OUTPUT &> /dev/null || nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
             nft add rule inet filter INPUT iif lo accept
             nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
             nft add rule inet filter INPUT ip protocol tcp ct state established accept
             nft add rule inet filter INPUT ip protocol udp ct state established accept
             nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
             nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
-            nft list ruleset > /etc/nftables.conf
-            cp /etc/nftables.conf /etc/sysconfig/nftables.conf
+            if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
+                nft list ruleset > /etc/sysconfig/nftables.conf
+            elif [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|arch)$ ]]; then
+                nft list ruleset > /etc/nftables.conf
+            else
+                print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
+                printf "%b%s%b and %b%s%b\n" "$CYAN" "/etc/nftables.conf" "$NC" "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
+                nft list ruleset | tee /etc/nftables.conf /etc/sysconfig/nftables.conf > /dev/null
+            fi
             systemctl enable --now nftables
-        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+        } || { print_status message error "Something went wrong, exiting..." ; return 1; }
 
     elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
         {
+            print_status message info "Backing up configuration (if it exists)..."
+            backup_firewall iptables init
             systemctl disable --now nftables &> /dev/null || true
             systemctl disable --now firewalld  &> /dev/null || true
             systemctl disable --now ufw &> /dev/null || true
             iptables -F &> /dev/null || true
-            ip6tables -F &> /dev/null || true
             iptables -P FORWARD DROP
             iptables -A INPUT -i lo -j ACCEPT
             iptables -A OUTPUT -o lo -j ACCEPT
@@ -841,6 +1042,7 @@ init_firewall() {
             iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
             iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
             iptables-save > /etc/iptables/rules.v4
+            ip6tables -F &> /dev/null || true
             ip6tables -P FORWARD DROP
             ip6tables -A INPUT -i lo -j ACCEPT
             ip6tables -A OUTPUT -o lo -j ACCEPT
@@ -851,9 +1053,9 @@ init_firewall() {
             ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
             ip6tables-save > /etc/iptables/rules.v6
             systemctl enable --now netfilter-persistent
-        } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
+        } || { print_status message error "Something went wrong, exiting..." ; return 1; }
     else
-        echo -e "${RED}Unrecognized firewall${NC}"
+        print_status message error "Unrecognized firewall"
         return 1
     fi
 }
@@ -946,17 +1148,18 @@ configure_firewall() {
     }
 
     fw_delete_rules() {
+        echo "Not yet implemented."
         return 0
     }
 
     fw_finalize_rules() {
         if [[ "${#rulelist[@]}" -le 0 ]]; then
-            echo -e "${RED}Rulelist is empty, add rules, then try again."
+            print_status message error "Rulelist is empty, add rules, then try again"
             return 1
         fi
 
-        if [[ "${active_firewall}" =~ ^(firewalld|ufw|nftables|iptables)$ ]]; then
-            echo -e "${RED}Unknown firewall."
+        if [[ ! "${active_firewall}" =~ ^(firewalld|ufw|nftables|iptables)$ ]]; then
+            print_status message error "Unrecognized firewall"
             return 1
         fi
 
@@ -979,6 +1182,7 @@ configure_firewall() {
             for interface in "${interfaces[@]}"; do
                 printf "${YELLOW}%s ${NC}" "$interface"
             done
+        interface=""
         echo -e ""
         fi
         echo -e "${RED}Is this information correct? (y/n)?${NC}"
@@ -1024,7 +1228,6 @@ configure_firewall() {
         echo -e "${RED}Applying rules to ${active_firewall}${NC}"
         # There is no default drop policy for output packets on firewalld, therefore rich rules have to be used
         if [[ "$active_firewall" = "firewalld" ]]; then
-            mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' | grep -v '^docker')
             {
                 firewall-cmd --new-zone=hardened --permanent
                 firewall-cmd --zone=hardened --set-target=DROP --permanent
@@ -1049,6 +1252,10 @@ configure_firewall() {
                     protocol=$(echo "$rule"| cut -d "/" -f 2 )
                     firewall-cmd --add-port="${port}/${protocol}"
                 done
+                for interface in "${interfaces[@]}"; do
+                    firewall-cmd --zone=hardened --add-interface="$interface" --permanent
+                done
+                firewall-cmd --set-default-zone=hardened
             } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
 
         elif [[ "$active_firewall" = "ufw" ]]; then
@@ -1061,8 +1268,8 @@ configure_firewall() {
                 ufw allow out 443/tcp
                 ufw allow out 80/tcp
                 ufw allow out 53/udp
-                ufw default deny incoming '{ policy drop; }'
-                ufw default deny incoming '{ policy drop; }'
+                ufw default deny incoming
+                ufw default deny outgoing
             } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
 
         elif [[ "$active_firewall" = "nftables" ]]; then
@@ -1076,7 +1283,6 @@ configure_firewall() {
                 printf "${RED}%s${YELLOW}%s${NC}" "Chain for INPUT, OUTPUT, or FORWARD was not found. Please ensure you ran" "fwconf"
                 return 1
             fi
-
             {
                 for rule in "${rulelist[@]}"; do
                     port=$(echo "$rule"| cut -d "/" -f 1 )
@@ -1088,9 +1294,19 @@ configure_firewall() {
                 nft add rule inet filter OUTPUT udp dport 53 accept
                 nft chain inet filter INPUT '{ policy drop; }'
                 nft chain inet filter OUTPUT '{ policy drop; }'
+                if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
+                    nft list ruleset > /etc/sysconfig/nftables.conf
+                elif [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|arch)$ ]]; then
+                    nft list ruleset > /etc/nftables.conf
+                else
+                    print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
+                    printf "%b%s%b and %b%s%b\n" "$CYAN" "/etc/nftables.conf" "$NC" "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
+                    nft list ruleset | tee /etc/nftables.conf /etc/sysconfig/nftables.conf > /dev/null
+                fi
             } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
 
         elif [[ "$active_firewall" = "iptables" ]]; then
+            # You are supposed to flush, then set policy, then rules, all to avoid packet losses, but we don't have that luxury
             {
                 for rule in "${rulelist[@]}"; do
                     port=$(echo "$rule"| cut -d "/" -f 1 )
@@ -1108,6 +1324,8 @@ configure_firewall() {
                 iptables -P OUTPUT DROP
                 ip6tables -P INPUT DROP
                 ip6tables -P OUTPUT DROP
+                iptables-save > /etc/iptables/rules.v4
+                ip6tables-save > /etc/iptables/rules.v6
             } || { printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..." ; return 1; }
         else
             printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
@@ -1441,7 +1659,7 @@ configure_authentication() {
 main() {
     clear
     init
-    # shellcheck disable=SC1091
+    
     [[ -f $HOME/.env ]] && . "$HOME/.env" &> /dev/null || \
         print_status message info "Couldn't find .env file, skipping..."
     check_installed_packages
