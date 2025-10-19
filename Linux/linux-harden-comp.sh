@@ -75,7 +75,7 @@ SKIP_MAIN="false"
 
 # Silently import .env before init even can, in case user set SKIP_MAIN="true"
 
-. "$HOME/.env" &> /dev/null
+. "$HOME/.env" &> /dev/null || true
 
 # Helper function to print status messages
 # print_status "message|not_found" "error|warn|info|success" "..."
