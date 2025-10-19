@@ -911,20 +911,20 @@ configure_permissions() {
         case "$type" in
             f)
                 if [[ ! -f "$path" ]]; then
-                    print_error not_found warn file "$path"
+                    print_status not_found warn file "$path"
                     permission="" path="" type="" owner="" group="" mode=""
                     continue
                 fi
                 ;;
             d)
                 if [[ ! -d "$path" ]]; then
-                    print_error not_found warn directory "$path"
+                    print_status not_found warn directory "$path"
                     permission="" path="" type="" owner="" group="" mode=""
                     continue
                 fi
                 ;;
             *)
-                print_error error "Type was not f or d."
+                print_status error "Type was not f or d."
                 return 1
                 ;;
         esac
@@ -937,7 +937,7 @@ configure_permissions() {
     if [ -f /etc/ssh/sshd_config ]; then
         chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
     else
-        print_error not_found warn file /etc/ssh/sshd_config
+        print_status not_found warn file /etc/ssh/sshd_config
     fi
     if [ -d /etc/ssh/sshd_config.d ]; then
         for file in /etc/ssh/sshd_config.d/*.conf; do
