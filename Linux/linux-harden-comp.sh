@@ -78,6 +78,11 @@ SKIP_MAIN="false"
 
 . "$HOME/.env" &> /dev/null || true
 
+# For testing purposes, will execute before init() within main()
+also_do() {
+    return 0
+}
+
 # Helper function to print status messages
 # print_status "message|not_found" "error|warn|info|success" "..."
 print_status() {
@@ -113,19 +118,16 @@ prst_message() {
 # print_status message_alt "error|warn|info|success" "partial printed text" "logged text"
 prst_message_alt() {
     case "$1" in
-        error)
-            printf "%b[ERROR]%b %b%s%b" "$EC" "$NC" "$RED" "$2" "$NC"
-            ;;
-        warn)
-            printf "%b[WARN]%b %b%s%b" "$WC" "$NC" "$YELLOW" "$2" "$NC"
-            ;;
-        info)
-            printf "%b[INFO]%b %b%s%b" "$IC" "$NC" "$BLUE" "$2" "$NC"
-            ;;
-        success)
-            printf "%b[SUCCESS]%b %b%s%b" "$SC" "$NC" "$SUCCESS" "$2" "$NC"
-            ;;
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
+    printf "%b[%s]%b %b%s%b" \
+        "$status_color" "$status" "$NC" \
+        "$text_color" "$2" "$NC"
 }
 
 # Not found status message
@@ -194,6 +196,46 @@ prst_already_exists() {
     esac
 }
 
+# using "package-manager" to install "package"
+# print_status using_to status "install|remove" "package-manager" "package"
+prst_using_to() {
+    case "$1" in
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
+    esac
+    case "$2" in
+        install) local action="install" ;;
+        remove) local action="remove" ;;
+        *) local action="$2" ;;
+    esac
+    printf "%b[%s]%b %bUsing%b %b%s%b %bto %s%b %b%s%b\n" \
+        "$status_color" "$status" "$NC" \
+        "$text_color" "$NC" \
+        "$YELLOW" "$3" "$NC" \
+        "$text_color" "$action" "$NC" \
+        "$YELLOW" "$4" "$NC"
+}
+
+# Not installed: package status message
+# print_status not_installed status "package"
+prst_not_installed() {
+    case "$1" in
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
+    esac
+    printf "%b[%s]%b %b%s%b: %bnot installed%b\n" \
+        "$status_color" "$status" "$NC" \
+        "$YELLOW" "$2" "$NC" \
+        "$text_color" "$NC"
+}
 # Invalid input status message
 # print_status invalid_input "error|info" "input"
 prst_invalid_input() {
@@ -255,44 +297,44 @@ prst_unsuccessful_function() {
 install_package() {
     local package_manager="$1"
     if [[ -z "$package_manager" ]]; then
-        echo "Error: No package manager provided to install_package."
+        print_status message error "No package manager specified"
         return 1
     fi
 
     local package_name="$2"
     if [[ -z "$package_name" ]]; then
-        echo "Error: No package name provided to install_package."
+        print_status message error "No package name specified"
         return 1
     fi
 
     if [[ "$package_manager" == "unsupported" ]]; then
-        echo "Error: Unsupported operating system."
+        print_status message error "Unsupported package manager"
         return 1
     fi
 
     case "$package_manager" in
         apt)
-            echo "Using apt to install $package_name..."
+            print_status using_to info install "apt" "$package_name"
             apt install -y "$package_name"
             ;;
         dnf)
-            echo "Using dnf to install $package_name..."
+            print_status message info "Using dnf to install ${package_name}"
             dnf install -y "$package_name"
             ;;
         yum)
-            echo "Using yum to install $package_name..."
+            print_status message info "Using yum to install ${package_name}"
             yum install -y "$package_name"
             ;;
         zypper)
-            echo "Using zypper to install $package_name..."
+            print_status message info "Using zypper to install ${package_name}"
             zypper install -y "$package_name"
             ;;
         pacman)
-            echo "Using pacman to install $package_name..."
+            print_status message info "Using pacman to install ${package_name}"
             pacman -Syu --noconfirm "$package_name"
             ;;
         *)
-            echo "Error: Unsupported package manager."
+            print_status message error "Unsupported package manager"
             return 1
             ;;
     esac
@@ -301,18 +343,18 @@ install_package() {
 remove_package() {
     local package_manager="$1"
     if [[ -z "$package_manager" ]]; then
-        echo "Error: No package manager provided to remove_package."
+        print_status message error "No package manager specified"
         return 1
     fi
 
     local package_name="$2"
     if [[ -z "$package_name" ]]; then
-        echo "Error: No package name provided to remove_package."
+        print_status message error "No package name specified"
         return 1
     fi
 
     if [[ "$package_manager" == "unsupported" ]]; then
-        echo "Error: Unsupported operating system."
+        print_status message error "Unsupported package manager"
         return 1
     fi
 
@@ -338,7 +380,7 @@ remove_package() {
             pacman -R "$package_name"
             ;;
         *)
-            echo "Error: Unsupported package manager."
+            print_status message error "Unsupported package manager"
             return 1
             ;;
     esac
@@ -350,8 +392,13 @@ init() {
     if [ -f /etc/os-release ]; then
         # freedesktop.org
         . /etc/os-release
-        DISTRO=$ID
-        VER=$VERSION_ID
+        case "$ID" in
+            ubuntu|debian|opensuse.*|centos|rocky|almalinux|fedora|rhel|ol)
+                DISTRO=$ID
+                VER=$VERSION_ID
+                ;;
+            *) DISTRO=$ID_LIKE VER="unknown-version" ;;
+        esac
     elif type lsb_release &> /dev/null; then
         # linuxbase.org
         DISTRO=$(lsb_release -si)
@@ -371,7 +418,7 @@ init() {
         VER=$(uname -r)
     fi
     DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
-    echo -e "${GREEN}Distribution ID:${NC} $DISTRO $VER"
+    printf "%bDistribution ID:%b %s %s\n" "${GREEN}" "${NC}" "$DISTRO" "$VER"
 
     # Choose correct package manager for distro
     case "$DISTRO" in
@@ -391,23 +438,15 @@ init() {
                 PKG_MANAGER="rpm"
             fi
             ;;
-        opensuse*)
-            PKG_MANAGER="zypper"
-            ;;
-        arch)
-            PKG_MANAGER="pacman"
-            ;;
-        *)
-            PKG_MANAGER="unsupported"
-            ;;
+        opensuse*) PKG_MANAGER="zypper" ;;
+        arch) PKG_MANAGER="pacman" ;;
+        *) PKG_MANAGER="unsupported" ;;
     esac
-
-    echo -e "${GREEN}Packge Manager:${NC} $PKG_MANAGER"
+    printf "%bPackage Manager:%b %s\n" "$GREEN" "$NC" "$PKG_MANAGER"
 
     # Find firewalls installed on the system
     FIREWALLS=()
     declare -gA FW_BACKUPS=()
-    local firewall=""
 
     # firewalld
     if command -v firewall-cmd &> /dev/null; then
@@ -429,51 +468,51 @@ init() {
         FIREWALLS+=("iptables")
     fi
 
-    echo -ne "${GREEN}Installed Firewalls: ${NC}"
+    local firewall
+    printf "%bInstalled Firewalls: %b" "$GREEN" "$NC"
     for firewall in "${FIREWALLS[@]}"; do
-        echo -ne "${RED}${firewall}${NC} "
+        printf "%b%s%b " "$RED" "$firewall" "$NC"
     done
-    echo ""
+    printf "\n"
 
     # Check if commands are present, and if their services are enabled
-    # One of these should be added for aide
     case "$DISTRO" in
-        ubuntu|debian|linuxmint|opensuse*)
+        ubuntu|debian|opensuse*)
             if systemctl is-active --quiet apparmor; then
-                echo -e "${YELLOW}apparmor.service ${NC}: ${GREEN}running${NC}"
+                printf "%bapparmor.service%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
                 if command -v aa-status &> /dev/null; then
-                    echo -e "${YELLOW}apparmor-utils ${NC}: ${GREEN}installed${NC}"
+                    printf "%apparmor-utils%b: %installed%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
                 else
-                    echo -e "${YELLOW}apparmor-utils ${NC}: ${RED}missing${NC}"
+                    printf "%bapparmor-utils%b: %not installed%b\n" "$YELLOW" "$NC" "$RED" "$NC"
                 fi
             else
-                echo -e "${YELLOW}apparmor.service ${NC}: ${RED}not running${NC}"
+                printf "%bapparmor.service%b: %bnot running%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
             fi
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
             if [[ ! -e /sys/fs/selinux/enforce ]]; then
-                echo -e "${YELLOW}SELinux ${NC}: ${RED}not enabled${NC}"
+                printf "%bSELinux%b: %bnot enabled%b\n" "$YELLOW" "$NC" "$RED" "$NC"
             elif [[ $(cat /sys/fs/selinux/enforce) -eq 1 ]]; then
-                echo -e "${YELLOW}SELinux ${NC}: ${GREEN}enforcing${NC}"
+                printf "%bSELinux%b: %benforcing%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
             else
-                echo -e "${YELLOW}SELinux ${NC}: ${RED}not enforcing${NC}"
+                printf "%bSELinux%b: %bnot enforcing%b\n" "$YELLOW" "$NC" "$RED" "$NC"
             fi
             ;;
     esac
 
     if systemctl is-active --quiet auditd; then
-        echo -e "${YELLOW}auditd.service ${NC}: ${GREEN}running${NC}"
+        printf "%bauditd.service%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
     else
-        echo -e "${YELLOW}auditd.service ${NC}: ${RED}not running${NC}"
+        printf "%bauditd.service%b: %bnot running%b\n" "$YELLOW" "$NC" "$RED" "$NC"
     fi
 
     if systemctl is-active --quiet dailyaidecheck.timer; then
-        echo -e "${YELLOW}dailyaidecheck.timer ${NC}: ${GREEN}running${NC}"
+        printf "%bdailyaidecheck.timer%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
     else
-        echo -e "${YELLOW}dailyaidecheck.timer ${NC}: ${RED}not running${NC}"
+        printf "%bdailyaidecheck.timer%b: %bnot running%b\n" "$YELLOW" "$NC" "$RED" "$NC"
     fi
 
-    command -v sudo &> /dev/null || echo -e "${RED}${BOLD}WARNING: ${NC}${YELLOW}sudo ${RED}${BOLD}IS NOT INSTALLED${NC}"
+    command -v sudo &> /dev/null || print_status not_installed alert "sudo"
 
     # Check for duplicate UIDs/GIDs and users/groups, as well as users with passwords
     # CIS Ubuntu 5.4.2 and 7.2
@@ -1724,6 +1763,7 @@ configure_authentication() {
 # Will present the main menu
 main() {
     clear
+    also_do
     init
     
     [[ -f $HOME/.env ]] && . "$HOME/.env" &> /dev/null || \
