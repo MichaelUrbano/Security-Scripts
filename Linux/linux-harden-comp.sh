@@ -63,6 +63,7 @@ readonly EC="${RED}${BOLD}" # [ERROR]
 readonly WC="${YELLOW}${BOLD}" # [WARN]
 readonly IC="${BLUE}${BOLD}" # [INFO]
 readonly SC="${GREEN}${BOLD}" # [SUCCESS]
+readonly UC="\033[1;4;43;31m" # [UNKNOWN]
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
@@ -163,6 +164,41 @@ prst_not_found() {
     esac
 }
 
+# Already Exists status message
+# print_status already_exists "error|warn" "file|directory|*" "path" "kind|rude"
+prst_already_exists() {
+    case "$2" in
+        file)
+            case "$1" in
+                error)
+                    printf "%b[ERROR]%b %bfile already exists:%b %b%s%b%b" "$EC" "$NC" "$RED" "$NC" "${CYAN}${BOLD}" "$3" "$NC" "$RED"
+                    ;;
+                warn)
+                    printf "%b[ERROR]%b %bfile already exists:%b %b%s%b%b" "$WC" "$NC" "$YELLOW" "$NC" "${CYAN}${BOLD}" "$3" "$NC" "$YELLOW"
+                    ;;
+            esac
+            ;;
+
+        directory)
+            case "$1" in
+                error)
+                    printf "%b[ERROR]%b %bdirectory already exists:%b %b%s%b%b" "$EC" "$NC" "$RED" "$NC" "${MAGENTA}${BOLD}" "$3" "$NC" "$RED"
+                    ;;
+                warn)
+                    printf "%b[WARN]%b %bdirectory already exists:%b %b%s%b%b" "$WC" "$NC" "$YELLOW" "$NC" "${MAGENTA}${BOLD}" "$3" "$NC" "$YELLOW"
+                    ;;
+            esac
+            ;;
+
+        *)
+            printf "not found: %s\n" "$3"
+    esac
+    case "$4" in
+        kind) printf ", Please remove it if you would like to try again\n" ;;
+        rude|*) printf "\n" ;;
+    esac
+}
+
 # Invalid input status message
 # print_status invalid_input "error|info" "input"
 prst_invalid_input() {
@@ -182,15 +218,25 @@ prst_invalid_input() {
 # print_status unrecognized_option "error|info" "input"
 prst_unrecognized_option() {
     case "$1" in
-        error)
-            printf "%b[ERROR]%b %bUnrecognized option:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "$RED" "$2" "$NC"
-            ;;
-        info)
-            printf "%b[INFO]%b %bUnrecognized option:%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$NC" "$BLUE" "$2" "$NC"
-            ;;
-        *)
-            printf "Unrecognized option: %s\n" "$2"
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
+    printf "%b[%s]%b %bUnrecognized option:%b %b%s%b\n" "$status_color" "$status" "$NC" "$text_color" "$NC" "$text_color" "$2" "$NC"
+}
+
+# print_status unsuccessful_function "error|warn" "function"
+prst_unsuccessful_function() {
+    case "$1" in
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
+    esac
+    printf "%b[%s]%b %b%s%b %bdid not complete successfully%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC"
 }
 
 install_package() {
@@ -290,7 +336,6 @@ init() {
     # Determine distro being used
     if [ -f /etc/os-release ]; then
         # freedesktop.org
-        
         . /etc/os-release
         DISTRO=$ID
         VER=$VERSION_ID
@@ -300,7 +345,6 @@ init() {
         VER=$(lsb_release -sr)
     elif [ -f /etc/lsb-release ]; then
         # For some versions of Debian/Ubuntu without lsb_release command
-        
         . /etc/lsb-release
         DISTRO=$DISTRIB_ID
         VER=$DISTRIB_RELEASE
@@ -599,10 +643,6 @@ ask_to_remove_packages() {
     for pkg in "${PACKAGES[@]}"; do
         remove_package "$PKG_MANAGER" "$pkg"
     done
-}
-
-auto_remove_packages() {
-    return 1
 }
 
 install_recommended_packages() {
@@ -993,7 +1033,7 @@ init_firewall() {
             ufw deny in from 127.0.0.0/8
             ufw deny in from ::1
             systemctl enable --now ufw
-            yes | ufw enable
+            ufw --force enable
         } || { print_status message error "Something went wrong, exiting..." ; return 1; }
 
     elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
@@ -1534,7 +1574,7 @@ EOF
 }
 
 configure_aide() {
-    command -v aide || { echo -e "${RED}Please ensure AIDE is installed on your system."; return 1; }
+    command -v aide &> /dev/null || { echo -e "${RED}Please ensure AIDE is installed on your system."; return 1; }
     case "$DISTRO" in
         ubuntu|debian|linuxmint)
             aideinit
@@ -1581,8 +1621,10 @@ disable_kernel_modules() {
 # CIS Debian 12: 3.1.1
 configure_sysctl() {
     local disable_ipv6="false"
-    local arg=""
+    local sysctl_file="/etc/sysctl.d/99-hardening.conf"
+    local limits_file="/etc/security/limits.d/99-hardening.conf"
 
+    local arg=""
     for arg in "$@"; do
         case "$arg" in
             disable_ipv6=true) disable_ipv6="true" ;;
@@ -1591,57 +1633,54 @@ configure_sysctl() {
         esac
     done
 
-    local sysctl_file="/etc/sysctl.d/99-hardening.conf"
-    local limits_file="/etc/security/limits.d/99-disable-dump.conf"
-
     declare -A settings=(
-        ["kernel\.randomize_va_space"]="2"
-        ["kernel\.yama\.ptrace_scope"]="2"
-        ["fs\.suid_dumpable"]="0"
-        ["net\.ipv4\.icmp_ignore_bogus_error_responses"]="1"
-        ["net\.ipv4\.icmp_echo_ignore_broadcasts"]="1"
-        ["net\.ipv4\.conf\.all\.rp_filter"]="2"
-        ["net\.ipv4\.conf\.default\.rp_filter"]="2"
-        ["net\.ipv4\.conf\.all\.log_martians"]="1"
-        ["net\.ipv4\.conf\.default\.log_martians"]="1"
-        ["net\.ipv4\.tcp_syncookies"]="1"
+        ["kernel.randomize_va_space"]="2"
+        ["kernel.yama.ptrace_scope"]="2"
+        ["fs.suid_dumpable"]="0"
+        ["net.ipv4.icmp_ignore_bogus_error_responses"]="1"
+        ["net.ipv4.icmp_echo_ignore_broadcasts"]="1"
+        ["net.ipv4.conf.all.rp_filter"]="2"
+        ["net.ipv4.conf.default.rp_filter"]="2"
+        ["net.ipv4.conf.all.log_martians"]="1"
+        ["net.ipv4.conf.default.log_martians"]="1"
+        ["net.ipv4.tcp_syncookies"]="1"
     )
 
     if [ $disable_ipv6 = "true" ]; then
-        settings["net\.ipv6\.conf\.all\.disable_ipv6"]="0"
+        settings["net.ipv6.conf.all.disable_ipv6"]="0"
     fi
 
-    touch "$sysctl_file"
-    touch "$limits_file"
+    if [ ! -d "/etc/sysctl.d" ]; then
+        print_status not_found error directory "/etc/sysctl.d"
+        return 1
+    fi
+    if [ -f "$sysctl_file" ]; then
+        print_status already_exists error file "$sysctl_file" kind
+        return 1
+    fi
 
-    # Here is a simplified explanation of this terrifying code:
-    # We iterate through each KEY in the associative array called settings (!settings[@])
-    # The settings array has multiple escape characters for periods, so grep doesn't interpret them as a metacharacter
-    # We then fetch the VALUE for that specific key (settings[$key])
-    # If we can find the line which has the relevant key, we edit it with sed to change to the correct value
-    # Otherwise, we append a new line with the correct key=value pair
-    # We also use sysctl -w to immediately apply the change
-    # (this may be complete overkill)
+    # This simply iterates through each element and appends it to the file,
+    # Additionally it sets it up via sysctl.
+    local value
     for key in "${!settings[@]}"; do
-        local value="${settings[$key]}"
-        if grep -q -E "^${key}\s*=" "$sysctl_file"; then
-            sed -i "s|^${key}\s*=.*|${key} = ${value}|" "$sysctl_file"
-        else
-            echo "${key} = ${value}" >> "$sysctl_file"
-        fi
-
+        value="${settings[$key]}"
+        echo "${key} = ${value}" >> "$sysctl_file"
         sysctl -w "${key}=${value}" &> /dev/null
     done
 
-    # Disable core dumps
     if [ ! -d "/etc/security/limits.d" ]; then
-        mkdir -p /etc/security/limits.d
+        print_status not_found error directory "/etc/security/limits.d"
+        return 1
     fi
+    if [ -f "$limits_file" ]; then
+        print_status already_exists error file "$sysctl_file" kind
+        return 1
+    fi
+    # Disable core dumps
     echo "* hard core 0" > "$limits_file"
-
 }
 
-# GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" (RHEL)
+# GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" (Ubuntu)
 # GRUB_CMDLINE_LINUX="audit=1 audit_backlog_limit=8192" (RHEL)
 configure_grub() {
     return 1
@@ -1690,7 +1729,7 @@ main() {
         while true; do
             read -rp "Enter an option: "
             case $REPLY in
-                backup|b) backup_directories ;;
+                backup|b) backup_directories || print_status unsuccessful_function error "backup_directories" ;;
                 upgrade|u) upgrade_system "$PKG_MANAGER" ;;
                 remove|r)
                     echo -e "${YELLOW}The following packages of concern were found:${NC}"
