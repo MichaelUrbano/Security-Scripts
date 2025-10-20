@@ -90,19 +90,14 @@ print_status() {
 # print_status "error|warn|info|success" "text"
 prst_message() {
     case "$1" in
-        error)
-            printf "%b[ERROR]%b %b%s%b\n" "$EC" "$NC" "$RED" "$2" "$NC"
-            ;;
-        warn)
-            printf "%b[WARN]%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$2" "$NC"
-            ;;
-        info)
-            printf "%b[INFO]%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$2" "$NC"
-            ;;
-        success)
-            printf "%b[SUCCESS]%b %b%s%b\n" "$SC" "$NC" "$SUCCESS" "$2" "$NC"
-            ;;
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
+    printf "%b[%s]%b %b%s%b\n" "$status_color" "$status" "$NC" "$text_color" "$2" "$NC"
 }
 
 # prst_message with a few quirks
@@ -225,6 +220,24 @@ prst_unrecognized_option() {
         *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
     printf "%b[%s]%b %bUnrecognized option:%b %b%s%b\n" "$status_color" "$status" "$NC" "$text_color" "$NC" "$text_color" "$2" "$NC"
+}
+
+# object found in file alert message
+# print_status found_in alert "input" "path"
+prst_found_in() {
+    case "$1" in
+        *) local status="ALERT" status_color="$EC" text_color="$EC";;
+    esac
+    printf "%b[%s]%b %b%s%b %bfound in%b %b%s%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC" "$CYAN" "$3" "$NC"
+}
+
+# Duplicate object found in file alert message
+# print_status duplicate_found_in alert "input" "path"
+prst_duplicate_found_in() {
+    case "$1" in
+        *) local status="ALERT" status_color="$EC" text_color="$EC";;
+    esac
+    printf "%b[%s] Duplicate%b %b%s%b %bfound in%b %b%s%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC" "$CYAN" "$3" "$NC"
 }
 
 # print_status unsuccessful_function "error|warn" "function"
@@ -425,7 +438,7 @@ init() {
     # Check if commands are present, and if their services are enabled
     # One of these should be added for aide
     case "$DISTRO" in
-        ubuntu|debian|linuxmint)
+        ubuntu|debian|linuxmint|opensuse*)
             if systemctl is-active --quiet apparmor; then
                 echo -e "${YELLOW}apparmor.service ${NC}: ${GREEN}running${NC}"
                 if command -v aa-status &> /dev/null; then
@@ -437,7 +450,7 @@ init() {
                 echo -e "${YELLOW}apparmor.service ${NC}: ${RED}not running${NC}"
             fi
             ;;
-        centos|rocky|almalinux|fedora|rhel|ol|opensuse*)
+        centos|rocky|almalinux|fedora|rhel|ol)
             if [[ ! -e /sys/fs/selinux/enforce ]]; then
                 echo -e "${YELLOW}SELinux ${NC}: ${RED}not enabled${NC}"
             elif [[ $(cat /sys/fs/selinux/enforce) -eq 1 ]]; then
@@ -481,66 +494,80 @@ init() {
     )
 
     if [[ "${#DUPLICATE_UIDS[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Duplicate UIDs found${NC}"
+        print_status message warn "Duplicate UIDs found"
         local uid=""
         for uid in "${DUPLICATE_UIDS[@]}"; do
             if [[ "$uid" -eq 0 ]]; then
-                echo -e "${RED}${BOLD}WARNING: Duplicate UID 0 account found${NC}"
+                print_status duplicate_found_in alert "UID 0" "/etc/passwd"
             fi
                 awk -F: -v uid="$uid" '($3 == uid) { print "User:", $1, "| UID:", $3 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_PRIMARY_GIDS[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Some users share the same primary GID${NC}"
+        print_status message warn "Some users share the same primary GID"
         local pgid=""
         for pgid in "${DUPLICATE_PRIMARY_GIDS[@]}"; do
             if [[ "$pgid" -eq 0 ]]; then
-                echo -e "${RED}${BOLD}WARNING: Duplicate Primary GID 0 account found${NC}"
+                print_status duplicate_found_in alert "Primary GID 0" "/etc/passwd"
             fi
                 awk -F: -v pgid="$pgid" '($4 == pgid) { print "User:", $1, "| GID:", $4 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_USERNAMES[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Duplicate usernames found${NC}"
+        print_status message warn "Duplicate usernames found"
         local username=""
         for username in "${DUPLICATE_USERNAMES[@]}"; do
             if [[ "$username" = "root" ]]; then
-                echo -e "${RED}${BOLD}WARNING: Duplicate ${YELLOW}root ${RED}account found${NC}"
+                print_status duplicate_found_in alert "root" "/etc/passwd"
             fi
                 awk -F: -v username="$username" '($1 == username) { print $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ":" $7 }' /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Duplicate GIDs found${NC}"
+        print_status message warn "Duplicate GIDs found"
         local gid=""
         for gid in "${DUPLICATE_GIDS[@]}"; do
             if [[ "$gid" -eq 0 ]]; then
-                echo -e "${RED}${BOLD}WARNING: Duplicate GID 0 group found${NC}"
+                print_status duplicate_found_in alert "GID 0" "/etc/group"
             fi
                 awk -F: -v gid="$gid" '($3 == gid) { print "Group:", $1, "| GID:", $3 }' /etc/group
         done
     fi
     if [[ "${#DUPLICATE_GROUP_NAMES[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Duplicate group names found${NC}"
+        print_status message warn "Duplicate group names found"
         local group_name=""
         for group_name in "${DUPLICATE_GROUP_NAMES[@]}"; do
             if [[ "$group_name" = "root" ]]; then
-                echo -e "${RED}${BOLD}WARNING: Duplicate ${YELLOW}root ${RED}group found${NC}"
+                print_status duplicate_found_in alert "root" "/etc/group"
             fi
                 awk -F: -v group_name="$group_name" '($1 == group_name) { print $1 ":" $2 ":" $3 }' /etc/group
         done
     fi
 
     # Checks if users are in the shadow group
-    # This needs to check the /etc/group file as well, currently doesn't do that
-    # Also needs to warn the user, doesn't do that currently
-    if [[ "$DISTRO" =~ ^(debian|ubuntu|linuxmint)$ ]]; then
+    if [[ "$DISTRO" =~ ^(debian|ubuntu|linuxmint|opensuse.*)$ ]]; then
         SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
         echo -e "${GREEN}shadow GID: ${YELLOW}${SHADOW_GID}${NC}"
         mapfile -t SHADOW_PGID < <(
-            awk -F: -v SHADOW_GID="$SHADOW_GID" '($3 == SHADOW_GID) { print $1 }' /etc/passwd
+            awk -F: -v SHADOW_GID="$SHADOW_GID" '($4 == SHADOW_GID) { print $1 }' /etc/passwd
         )
-
+        mapfile -t SHADOW_GROUP_MEMBER < <(
+            awk -F: '($1 == "shadow")  { print $4 }' /etc/group
+        )
+        if [[ "${#SHADOW_PGID[@]}" -gt 0 ]]; then
+            print_status found_in alert "Users with Primary GID of shadow group" "/etc/passwd"
+            local user
+            for user in "${SHADOW_PGID[@]}"; do
+                printf "%s\n" "$user"
+            done
+        fi
+        if [[ "${#SHADOW_GROUP_MEMBER[@]}" -gt 0 ]]; then
+            print_status found_in alert "Users apart of shadow group" "/etc/group"
+            local user
+            for user in "${SHADOW_GROUP_MEMBER[@]}"; do
+                printf "%s\n" "$user"
+            done
+        fi
     fi
 
     # This keeps a portion of the password section, just so the user can confirm that the script isnt lying
