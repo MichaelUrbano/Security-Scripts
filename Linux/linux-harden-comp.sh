@@ -67,7 +67,12 @@ readonly UC="\033[1;4;43;31m" # [UNKNOWN]
 
 # Check root
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${YELLOW}This script must be run as ${RED}${BOLD}root${NC}${YELLOW}, or with ${RED}${BOLD}sudo.${NC}" >&2
+    printf "%bThis script must be run as%b %broot%b%b, or with%b %bsudo%b%b.%b\n" \
+        "$YELLOW" "$NC" \
+        "${RED}${BOLD}" "$NC" \
+        "$YELLOW" "$NC" \
+        "${RED}${BOLD}" "$NC" \
+        "$YELLOW" "$NC"
     exit 1
 fi
 
@@ -75,7 +80,6 @@ fi
 SKIP_MAIN="false"
 
 # Silently import .env before init even can, in case user set SKIP_MAIN="true"
-
 . "$HOME/.env" &> /dev/null || true
 
 # For testing purposes, will execute before init() within main()
@@ -88,13 +92,15 @@ also_do() {
 print_status() {
     local name="$1"
     shift
-    "prst_${name}" "$@" || printf "%b%s%b\n" "$EC" "Invalid Error" "$NC"
+    "prst_${name}" "$@" || printf "%b%s%b\n" "$UC" "Unknown Error" "$UC"
 }
 
 # Generic status message
-# print_status "error|warn|info|success" "text"
+# print_status message status "text"
 prst_message() {
-    case "$1" in
+    local input_status="$1"
+    local input_text="$2"
+    case "$input_status" in
         error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
         warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
         info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -102,7 +108,35 @@ prst_message() {
         alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
         *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
-    printf "%b[%s]%b %b%s%b\n" "$status_color" "$status" "$NC" "$text_color" "$2" "$NC"
+    printf "%b[%s]%b %b%s%b\n" \
+    "$status_color" "$status" "$NC" \
+    "$text_color" "$input_text" "$NC"
+}
+
+# Generic status message for text, with an object appended at the end
+# print_status message_object status object "text" "object"
+prst_message_object() {
+    local input_status="$1"
+    local input_object="$2"
+    local input_object="$3"
+    case "$input_status" in
+        error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+        warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+        info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+        success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+        alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+        *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
+    esac
+    case "$input_object" in
+        file) local object="$3" object_color="$CYAN" ;;
+        directory) local object="$3" object_color="$MAGENTA" ;;
+        command|function) local object="$3" object_color="${YELLOW}${BOLD}" ;;
+        *) local object="$3" object_color="$UC" ;;
+    esac
+    printf "%b[%s]%b %b%s%b %b%s%b\n" \
+    "$status_color" "$status" "$NC" \
+    "$text_color" "$input_text" "$NC" \
+    "$object_color" "$object" "$NC"
 }
 
 # prst_message with a few quirks
@@ -667,11 +701,15 @@ check_installed_packages() {
     case $DISTRO in
         ubuntu|debian|linuxmint)
             local -ar candidate_pkgs=(
-                autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd dovecot-imapd nfs-kernel-server ypserv cups rpcbind
-                rsync samba snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis rsh-client talk telnet inetutils-telnet
-                ldap-utils ftp tnftp prelink apport gnome gdm3 netcat-openbsd netcat-traditional ncat wireshark tshark tcpdump gcc make
-                rsh-server telnetd nmap proftpd pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd unbound lighttpd vnc-server
-                tightvncserver tigervnc-standalone-server linuxvnc x11vnc
+                autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd
+                dovecot-imapd nfs-kernel-server ypserv cups rpcbind rsync samba
+                snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis
+                rsh-client talk telnet inetutils-telnet ldap-utils ftp tnftp
+                prelink apport gnome gdm3 netcat-openbsd netcat-traditional
+                ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap
+                proftpd pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd
+                unbound lighttpd vnc-server tightvncserver
+                tigervnc-standalone-server linuxvnc x11vnc
             )
             for pkg in "${candidate_pkgs[@]}"; do
                 dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
@@ -679,11 +717,15 @@ check_installed_packages() {
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
             local -ar candidate_pkgs=(
-                mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups
-                rpcbind rsync-daemon net-snmp telnet-server tftp-server squid httpd nginx xinetd xorg-x11-server-common ftp
-                openldap-clients ypbind telnet tftp @graphical-server-environment @workstation-product-environment netcat nmap-ncat
-                wireshark wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd pure-ftpd unbound lighttpd tigervnc-server
-                tigervnc-server-minimal
+                mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq
+                samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups
+                rpcbind rsync-daemon net-snmp telnet-server tftp-server squid
+                httpd nginx xinetd xorg-x11-server-common ftp
+                openldap-clients ypbind telnet tftp
+                @graphical-server-environment @workstation-product-environment
+                netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh
+                rsh-server nmap proftpd pure-ftpd unbound lighttpd
+                tigervnc-server tigervnc-server-minimal
             )
             for pkg in "${candidate_pkgs[@]}"; do
                 rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
@@ -929,7 +971,7 @@ restore_firewall() {
     local path
     for path in "${!FW_BACKUPS[@]}"; do
         cp "$path" "${FW_BACKUPS["$path"]}" || {
-            print_status message error "Failed to restore $path"
+            print_status message error "Failed to restore ${path}"
             return 1
         }
     done
@@ -1039,24 +1081,53 @@ configure_permissions() {
         permission="" path="" type="" owner="" group="" mode=""
     done
 
+    local file
     # 5.1.1
-    if [ -f /etc/ssh/sshd_config ]; then
-        chown root:root /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config
+    if [[ -f /etc/ssh/sshd_config ]]; then
+        chown root:root /etc/ssh/sshd_config && chmod 0600 /etc/ssh/sshd_config
     else
-        print_status not_found warn file /etc/ssh/sshd_config
+        print_status not_found warn file "/etc/ssh/sshd_config"
     fi
-    if [ -d /etc/ssh/sshd_config.d ]; then
+    if [[ -d /etc/ssh/sshd_config.d ]]; then
         for file in /etc/ssh/sshd_config.d/*.conf; do
             [ -e "$file" ] || continue
-            chown root:root "$file"
-            chmod 600 "$file"
+            chown root:root "$file" && chmod 0600 "$file"
         done
+    else
+        print_status not_found warn directory "/etc/ssh/sshd_config.d"
     fi
 
     # 5.1.2-3
-    if [ -d /etc/ssh ]; then
-        true
-    fi
+    case "$DISTRO" in
+    ubuntu|debian|fedora|opensuse*)
+        if [[ -d /etc/ssh ]]; then
+            for file in /etc/ssh/*.pub; do
+                [[ -e "$file" ]] || continue
+                chown root:root "$file" && chmod 0644 "$file"
+            done
+            for file in /etc/ssh/*; do
+                [[ "$file" =~ key$ ]] || continue
+                chown root:root "$file" && chmod 0600 "$file"
+            done
+        else
+            print_status not_found warn directory "/etc/ssh"
+        fi
+        ;;
+    centos|rocky|almalinux|rhel|ol)
+        if [[ -d /etc/ssh ]]; then
+            for file in /etc/ssh/*.pub; do
+                [[ -e "$file" ]] || continue
+                chown root:root "$file" && chmod 0644 "$file"
+            done
+            for file in /etc/ssh/*; do
+                [[ "$file" =~ key$ ]] || continue
+                chown root:ssh_keys "$file" && chmod 0600 "$file"
+            done
+        else
+            print_status not_found warn directory "/etc/ssh"
+        fi
+        ;;
+    esac
 }
 
 # CIS Debian 12: 4
@@ -1492,14 +1563,31 @@ configure_firewall() {
 
     local rulelist=()
     fw_help
-    echo -e "Configuring ${RED}${active_firewall}${NC}..."
-    echo -e "${GREEN}If ${RED}${active_firewall}${GREEN} is not the correct firewall, please enter ${YELLOW}q${GREEN} below, and ensure other firewalls are not installed.${NC}"
+    printf "%bConfiguring%b %b%s%b%b...%b\n" \
+        "$GREEN" "$NC" \
+        "$RED" "$active_firewall" "$NC" \
+        "$GREEN" "$NC"
+    printf \
+        "%bIf%b %b%s%b %bis not the correct firewall, enter%b %bq%b %bbelow to cancel the configuration process%b\n" \
+        "$GREEN" "$NC" \
+        "$RED" "$active_firewall" "$NC" \
+        "$GREEN" "$NC" \
+        "${YELLOW}${BOLD}" "$NC" \
+        "$GREEN" "$NC"
     while true; do
         read -rp "Enter command (h|q|a|s|l|d|r|f): "
         case "$REPLY" in
-            help|h) fw_help ;;
-            quit|exit|q|ex) clear ; return 0 ;;
-            append|a) fw_add_rules ; clear ;;
+            help|h) 
+                fw_help
+                ;;
+            quit|exit|q|ex) 
+                clear
+                return 0
+                ;;
+            append|a) 
+                fw_add_rules
+                clear
+                ;;
             list|l)
                 local service=""
                 for service in "${service_ports[@]}"; do
@@ -1514,121 +1602,134 @@ configure_firewall() {
                 done
                 echo -e ""
                 ;;
-            delete|d) fw_delete_rules ;;
-            reset|r) rulelist=() ; echo -e "${YELLOW}Reset rulelist${NC}" ;;
-            finalize|f) fw_finalize_rules ;;
-            *) echo -e "${RED}Unrecognized option${NC}" ; REPLY="" ;;
+            delete|d)
+                fw_delete_rules
+                ;;
+            reset|r)
+                rulelist=()
+                echo -e "${YELLOW}Reset rulelist${NC}" 
+                ;;
+            finalize|f)
+                fw_finalize_rules
+                ;;
+            *) 
+                echo -e "${RED}Unrecognized option${NC}"
+                REPLY=""
+                ;;
         esac
     done
 }
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
-    command -v auditctl || { echo -e "${RED}Please ensure auditd is installed on your system."; return 1; }
+    command -v auditctl || {
+        print_status message error "Please ensure auditd is installed"
+        return 1
+    }
     if [[ -d /etc/audit/rules.d && ! -f /etc/audit/rules.d/99-hardening.rules ]]; then
-        cat <<- 'EOF' | tee /etc/audit/rules.d/99-hardening.rules
-            # These rules were added by Michael's Linux Hardening Script
-            # These rules are based off ones provided by the CIS Security benchmarks
+        cat << 'EOF' | tee /etc/audit/rules.d/99-hardening.rules
+# These rules were added by Michael's Linux Hardening Script
+# These rules are based off ones provided by the CIS Security benchmarks
 
-            # 6.2.3.1/6.3.3.1
-            -w /etc/sudoers -p wa -k scope
-            -w /etc/sudoers.d -p wa -k scope
+# 6.2.3.1/6.3.3.1
+-w /etc/sudoers -p wa -k scope
+-w /etc/sudoers.d -p wa -k scope
 
-            # 6.2.3.2/6.3.3.2
-            -a always,exit -F arch=b64 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
-            -a always,exit -F arch=b32 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
+# 6.2.3.2/6.3.3.2
+-a always,exit -F arch=b64 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
+-a always,exit -F arch=b32 -S execve -C uid!=euid -F auid!=-1 -F key=user_emulation
 
-            # 6.2.3.3/6.3.3.3
-            -w /var/log/sudo.log -p wa -k sudo_log_file
+# 6.2.3.3/6.3.3.3
+-w /var/log/sudo.log -p wa -k sudo_log_file
 
-            # 6.2.3.4/6.3.3.4
-            -a always,exit -F arch=b64 -S adjtimex,settimeofday -k time-change
-            -a always,exit -F arch=b32 -S adjtimex,settimeofday -k time-change
-            -a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -k time-change
-            -a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -k time-change
-            -w /etc/localtime -p wa -k time-change
+# 6.2.3.4/6.3.3.4
+-a always,exit -F arch=b64 -S adjtimex,settimeofday -k time-change
+-a always,exit -F arch=b32 -S adjtimex,settimeofday -k time-change
+-a always,exit -F arch=b64 -S clock_settime -F a0=0x0 -k time-change
+-a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -k time-change
+-w /etc/localtime -p wa -k time-change
 
-            # 6.2.3.5/6.3.3.5
-            -a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale
-            -a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale
-            -w /etc/issue -p wa -k system-locale
-            -w /etc/issue.net -p wa -k system-locale
-            -w /etc/hosts -p wa -k system-locale
-            -w /etc/networks -p wa -k system-locale
-            -w /etc/network -p wa -k system-locale
-            -w /etc/netplan -p wa -k system-locale
-            -w /etc/hostname -p wa -k system-locale
-            -w /etc/sysconfig/network -p wa -k system-locale
-            -w /etc/sysconfig/network-scripts/ -p wa -k system-locale
-            -w /etc/NetworkManager -p wa -k system-locale
+# 6.2.3.5/6.3.3.5
+-a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale
+-a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale
+-w /etc/issue -p wa -k system-locale
+-w /etc/issue.net -p wa -k system-locale
+-w /etc/hosts -p wa -k system-locale
+-w /etc/networks -p wa -k system-locale
+-w /etc/network -p wa -k system-locale
+-w /etc/netplan -p wa -k system-locale
+-w /etc/hostname -p wa -k system-locale
+-w /etc/sysconfig/network -p wa -k system-locale
+-w /etc/sysconfig/network-scripts/ -p wa -k system-locale
+-w /etc/NetworkManager -p wa -k system-locale
 
-            # 6.2.3.6/6.3.3.6
-            # Not yet implemented
+# 6.2.3.6/6.3.3.6
+# Not yet implemented
 
-            # 6.2.3.7/6.3.3.7
-            -a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
-            -a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
-            -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
-            -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+# 6.2.3.7/6.3.3.7
+-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
 
-            # 6.2.3.8/6.3.3.8
-            -w /etc/group -p wa -k identity
-            -w /etc/passwd -p wa -k identity
-            -w /etc/gshadow -p wa -k identity
-            -w /etc/shadow -p wa -k identity
-            -w /etc/security/opasswd -p wa -k identity
-            -w /etc/nsswitch.conf -p wa -k identity
-            -w /etc/pam.conf -p wa -k identity
-            -w /etc/pam.d -p wa -k identity
+# 6.2.3.8/6.3.3.8
+-w /etc/group -p wa -k identity
+-w /etc/passwd -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/security/opasswd -p wa -k identity
+-w /etc/nsswitch.conf -p wa -k identity
+-w /etc/pam.conf -p wa -k identity
+-w /etc/pam.d -p wa -k identity
 
-            # 6.2.3.9/6.3.3.9
-            -a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
-            -a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
-            -a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
-            -a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
-            -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
-            -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+# 6.2.3.9/6.3.3.9
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
 
-            # 6.2.3.10/6.3.3.10
-            -a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts
-            -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts
+# 6.2.3.10/6.3.3.10
+-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts
+-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts
 
-            # 6.2.3.11/6.3.3.11
-            -w /var/run/utmp -p wa -k session
-            -w /var/log/wtmp -p wa -k session
-            -w /var/log/btmp -p wa -k session
+# 6.2.3.11/6.3.3.11
+-w /var/run/utmp -p wa -k session
+-w /var/log/wtmp -p wa -k session
+-w /var/log/btmp -p wa -k session
 
-            # 6.2.3.12/6.3.3.12
-            -w /var/log/lastlog -p wa -k logins
-            -w /var/run/faillock -p wa -k logins
+# 6.2.3.12/6.3.3.12
+-w /var/log/lastlog -p wa -k logins
+-w /var/run/faillock -p wa -k logins
 
-            # 6.2.3.13/6.3.3.13
-            -a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
-            -a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+# 6.2.3.13/6.3.3.13
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
 
-            # 6.2.3.14/6.3.3.14
-            -w /etc/apparmor/ -p wa -k MAC-policy
-            -w /etc/apparmor.d/ -p wa -k MAC-policy
-            -w /etc/selinux -p wa -k MAC-policy
-            -w /usr/share/selinux -p wa -k MAC-policy
+# 6.2.3.14/6.3.3.14
+-w /etc/apparmor/ -p wa -k MAC-policy
+-w /etc/apparmor.d/ -p wa -k MAC-policy
+-w /etc/selinux -p wa -k MAC-policy
+-w /usr/share/selinux -p wa -k MAC-policy
 
-            # 6.2.3.15/6.3.3.15
-            -a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+# 6.2.3.15/6.3.3.15
+-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
 
-            # 6.2.3.16/6.3.3.16
-            -a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+# 6.2.3.16/6.3.3.16
+-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
 
-            # 6.2.3.17/6.3.3.17
-            -a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+# 6.2.3.17/6.3.3.17
+-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
 
-            # 6.2.3.18/6.3.3.18
-            -a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k usermod
+# 6.2.3.18/6.3.3.18
+-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k usermod
 
-            # 6.2.3.19/6.3.3.19
-            -a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
+# 6.2.3.19/6.3.3.19
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
 
-            # 6.2.3.20/6.3.3.20
-            -e 2
+# 6.2.3.20/6.3.3.20
+-e 2
 EOF
         augenrules --load
         augenrules --check
@@ -1640,7 +1741,10 @@ EOF
 }
 
 configure_aide() {
-    command -v aide &> /dev/null || { echo -e "${RED}Please ensure AIDE is installed on your system."; return 1; }
+    command -v aide &> /dev/null || { 
+        print_status message error "Please ensure AIDE is installed."
+        return 1
+    }
     case "$DISTRO" in
         ubuntu|debian|linuxmint)
             aideinit
@@ -1651,7 +1755,8 @@ configure_aide() {
             mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
             ;;
         *)
-            echo -e "${RED}Unsupported distribution${NC}"
+            print_status message error \
+                "Unsupported distribution, cannot configure"
             return 1
             ;;
     esac
@@ -1670,7 +1775,10 @@ configure_clamav() {
 # MANUAL: 1.1.1.10
 # Will disable unnecessary kernel modules
 disable_kernel_modules() {
-    modules=("cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage" "dccp" "tipc" "rds" "sctp")
+    modules=(
+        "cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage"
+        "dccp" "tipc" "rds" "sctp"
+    )
     local custom_blacklist="/etc/modprobe.d/custom-blacklist.conf"
     local mod=""
     touch "$custom_blacklist"
@@ -1746,10 +1854,32 @@ configure_sysctl() {
     echo "* hard core 0" > "$limits_file"
 }
 
-# GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" (Ubuntu)
-# GRUB_CMDLINE_LINUX="audit=1 audit_backlog_limit=8192" (RHEL)
+# Will change boot parameters and ensure MAC is enforced
 configure_grub() {
-    return 1
+    if [[ ! -f /etc/default/grub ]]; then
+        print_status not_found error file "/etc/default/grub"
+        return 1
+    fi
+
+    if grep -q -E '^\s*GRUB_CMDLINE_LINUX="\s*"$' /etc/default/grub; then
+        sed -i -E \
+            's/^\s*GRUB_CMDLINE_LINUX="\s*"$/GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
+            /etc/default/grub
+    elif grep -q -E '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+        sed -i -E \
+            's/^\s*(GRUB_CMDLINE_LINUX=".*)"/\1 apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
+            /etc/default/grub
+    elif ! grep -q -E '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+        echo GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" \
+            >> /etc/default/grub
+    else
+        print_status message_alt error \
+            "Failed to append to " "/etc/default/grub"
+        printf "%b%s%b" "$YELLOW" "/etc/default/grub" "$NC"
+        return 1
+    fi
+
+    print_status message success "Reconfigured GRUB successfully"
 }
 
 configure_sshd() {
@@ -1768,90 +1898,199 @@ main() {
     
     [[ -f $HOME/.env ]] && . "$HOME/.env" &> /dev/null || \
         print_status message info "Couldn't find .env file, skipping..."
-    check_installed_packages
+    check_installed_packages || print_status unsuccessful_function error \
+        "check_installed_packages"
     if [[ "${#PACKAGES[@]}" -gt 0 ]]; then
-        echo -e "${YELLOW}Possibly unwanted packages were found, run remove/r to determine which you would like to keep, and which to remove${NC}"
+        print_status message warn \
+            "Potentially unwanted packages found, run remove/r to review them"
     fi
+
     while true; do
-        printf "${GREEN}%s${NC}\n" "Welcome to Michael's Linux Hardening Script (Generic Competition Edition)"
-        printf "${GREEN}%s${NC}\n" "Enter the name of an option below:"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "backup" "Will back up \"important directories\""
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "upgrade" "Will upgrade your system"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "remove" "Will ask to remove possibly unnecessary packages"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "install" "Will ask to install possibly helpful packages"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "mac" "Not Yet Implemented"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwinit" "(EXPERIMENTAL)" "Will initialize the firewall on your system"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" "fwconf" "(EXPERIMENTAL)" "Will help you configure firewall rules"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "audit" "Will initialize auditd rules"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "aide" "Will initialize AIDE (may take awhile)"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "fail" "Not Yet Implemented"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "clam" "Not Yet Implemented"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "perms" "Will change permissions on important files for improved security"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" "parts" "Not Yet Implemented"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "modules" "Will Disable unnecessary kernel modules"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "sysctl" "Will reconfigure sysctl parameters for improved security"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "init" "Show inital information gathered at beginning of the script"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "exit" "Quit program"
+        printf "${GREEN}%s${NC}\n" \
+            "Welcome to Michael's Linux Hardening Script (Competition Edition)"
+        printf "${GREEN}%s${NC}\n" \
+            "Enter the name of an option below:"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "backup" "Will back up \"important directories\""
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "upgrade" "Will upgrade your system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "remove" "Will ask to remove potentially unwanted packages"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "install" "Will ask to install possibly helpful packages"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+            "mac" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" \
+            "fwinit" "(EXPERIMENTAL)" \
+            "Will initialize the firewall on your system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" \
+            "fwconf" "(EXPERIMENTAL)" \
+            "Will help you configure firewall rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "audit" "Will initialize auditd rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "aide" "Will initialize AIDE (may take awhile)"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+            "fail" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+            "clam" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "grub" "Will configure bootloader parameters"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "perms" \
+            "Will change permissions on important files for improved security"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+            "parts" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "modules" "Will disable unnecessary kernel modules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "sysctl" "Will reconfigure sysctl parameters for improved security"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "init" "Show inital information gathered at beginning of the script"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "exit" "Quit program"
         printf "\n"
+
         while true; do
             read -rp "Enter an option: "
             case $REPLY in
-                backup|b) backup_directories || print_status unsuccessful_function error "backup_directories" ;;
-                upgrade|u) upgrade_system "$PKG_MANAGER" ;;
+                backup|b) 
+                    backup_directories \
+                        || print_status unsuccessful_function error \
+                        "backup_directories"
+                    ;;
+                upgrade|u)
+                    upgrade_system "$PKG_MANAGER" \
+                        || print_status unsuccessful_function error \
+                        "upgrade_system"
+                    ;;
                 remove|r)
-                    echo -e "${YELLOW}The following packages of concern were found:${NC}"
+                    print_status message warn \
+                        "Potentially unwated packages found:"
                     for pkg in "${PACKAGES[@]}"; do
-                        echo -e "${RED}$pkg${NC}"
+                        printf "%b%s%b " "$RED" "$pkg" "$NC"
                     done
-                    ask_to_remove_packages
-                    check_installed_packages
+                    ask_to_remove_packages \
+                        || print_status unsuccessful_function error \
+                        "ask_to_remove_packages"
+                    check_installed_packages \
+                        || print_status unsuccessful_function error \
+                        "check_installed_packages"
                     ;;
                 install|i)
-                    local option_one=""
-                    local option_two=""
+                    local option_one
+                    local option_two
                     while true; do
-                        read -rp "Install remote logging packages? (y/n): " option_one
+                        read -rp "Install remote logging packages? (y/n): " \
+                            option_one
                         case $option_one in
-                            y) option_one="true" && break ;;
-                            n) option_one="false" && break ;;
-                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                            y) 
+                                option_one="true" && break
+                                ;;
+                            n) 
+                                option_one="false" && break
+                                ;;
+                            *)
+                                printf "${RED}%s${NC}\n" \
+                                    "Unrecognized option, try again"
+                                ;;
                         esac
                     done
 
                     while true; do
-                        read -rp "Install extra security packages? (y/n): " option_two
+                        read -rp "Install extra security packages? (y/n): " \
+                            option_two
                         case $option_two in
-                            y) option_two="true" && break ;;
-                            n) option_two="false" && break ;;
-                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                            y) 
+                                option_two="true" && break ;;
+                            n) 
+                                option_two="false" && break ;;
+                            *) 
+                                printf "${RED}%s${NC}\n" \
+                                    "Unrecognized option, try again"
+                                ;;
                         esac
                     done
 
-                    install_recommended_packages "remote_logging=$option_one" "extra_security=$option_two"
+                    install_recommended_packages \
+                        "remote_logging=$option_one" \
+                        "extra_security=$option_two" \
+                        || print_status unsuccessful_function error \
+                        "install_recommended_packages"
                     option_one=""
                     option_two=""
                     ;;
-                mac) configure_mac ;;
-                fwinit) init_firewall ;;
+                mac) 
+                    configure_mac \
+                        || print_status unsuccessful_function error \
+                        "configure_mac"
+                    ;;
+                fwinit) 
+                    init_firewall \
+                        || print_status unsuccessful_function error \
+                        "init_firewall"
+                    ;;
                 fwconf)
                     clear
-                    configure_firewall
+                    configure_firewall \
+                        || print_status unsuccessful_function error \
+                        "configure_firewall"
                     ;;
-                audit) configure_auditd ;;
-                aide) configure_aide ;;
-                fail) configure_fail2ban ;;
-                clam) configure_clamav ;;
-                perms) configure_permissions ;;
-                parts) configure_partitions ;;
-                modules) disable_kernel_modules ;;
+                audit) 
+                    configure_auditd \
+                        || print_status unsuccessful_function error \
+                        "configure_auditd"
+                    ;;
+                aide) 
+                    configure_aide \
+                        || print_status unsuccessful_function error \
+                        "configure_aide"
+                    ;;
+                fail) 
+                    configure_fail2ban \
+                        || print_status unsuccessful_function error \
+                        "configure_fail2ban"
+                    ;;
+                clam) 
+                    configure_clamav \
+                        || print_status unsuccessful_function error \
+                        "configure_clamav"
+                    ;;
+                grub)
+                    configure_grub \
+                        || print_status unsuccessful_function error \
+                        "configure_grub"
+                    ;;
+                perms) 
+                    configure_permissions \
+                        || print_status unsuccessful_function error \
+                        "configure_permissions"
+                    ;;
+                parts) 
+                    configure_partitions \
+                        || print_status unsuccessful_function error \
+                        "configure_partitions"
+                    ;;
+                modules) 
+                    disable_kernel_modules \
+                        || print_status unsuccessful_function error \
+                        "disable_kernel_modules"
+                    ;;
                 sysctl)
-                    local option_one=""
+                    local option_one
                     while true; do
                         read -rp "Disable IPv6? (y/n): " option_one
                         case $option_one in
-                            y) option_one="true" && break ;;
-                            n) option_one="false" && break ;;
-                            *) printf "${RED}%s${NC}\n" "Unrecognized option, try again" ;;
+                            y) 
+                                option_one="true" && break
+                                ;;
+                            n) 
+                                option_one="false" && break
+                                ;;
+                            *) 
+                                printf "${RED}%s${NC}\n" \
+                                    "Unrecognized option, try again"
+                                ;;
                         esac
                     done
 
