@@ -295,7 +295,10 @@ prst_unrecognized_option() {
         success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
         *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
-    printf "%b[%s]%b %bUnrecognized option:%b %b%s%b\n" "$status_color" "$status" "$NC" "$text_color" "$NC" "$text_color" "$2" "$NC"
+    printf "%b[%s]%b %bUnrecognized option:%b %b%s%b\n" \
+        "$status_color" "$status" "$NC" \
+        "$text_color" "$NC" \
+        "$text_color" "$2" "$NC"
 }
 
 # object found in file alert message
@@ -304,7 +307,11 @@ prst_found_in() {
     case "$1" in
         *) local status="ALERT" status_color="$EC" text_color="$EC";;
     esac
-    printf "%b[%s]%b %b%s%b %bfound in%b %b%s%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC" "$CYAN" "$3" "$NC"
+    printf "%b[%s]%b %b%s%b %bfound in%b %b%s%b\n" \
+        "$status_color" "$status" "$NC" \
+        "${YELLOW}${BOLD}" "$2" "$NC" \
+        "$text_color" "$NC" \
+        "$CYAN" "$3" "$NC"
 }
 
 # Duplicate object found in file alert message
@@ -313,7 +320,12 @@ prst_duplicate_found_in() {
     case "$1" in
         *) local status="ALERT" status_color="$EC" text_color="$EC";;
     esac
-    printf "%b[%s] Duplicate%b %b%s%b %bfound in%b %b%s%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC" "$CYAN" "$3" "$NC"
+    printf "%b[%s]%b %bDuplicate%b %b%s%b %bfound in%b %b%s%b\n" \
+        "$status_color" "$status" "$NC" \
+        "$text_color" "$NC" \
+        "${YELLOW}${BOLD}" "$2" "$NC" \
+        "$text_color" "$NC" \
+        "$CYAN" "$3" "$NC"
 }
 
 # print_status unsuccessful_function "error|warn" "function"
@@ -325,7 +337,10 @@ prst_unsuccessful_function() {
         success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
         *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
     esac
-    printf "%b[%s]%b %b%s%b %bdid not complete successfully%b\n" "$status_color" "$status" "$NC" "${YELLOW}${BOLD}" "$2" "$NC" "$text_color" "$NC"
+    printf "%b[%s]%b %b%s%b %bdid not complete successfully%b\n" \
+        "$status_color" "$status" "$NC" \
+        "${YELLOW}${BOLD}" "$2" "$NC" \
+        "$text_color" "$NC"
 }
 
 install_package() {
@@ -431,7 +446,10 @@ init() {
                 DISTRO=$ID
                 VER=$VERSION_ID
                 ;;
-            *) DISTRO=$ID_LIKE VER="unknown-version" ;;
+            *)
+                DISTRO=${ID_LIKE%% *}
+                VER="unknown-version"
+                ;;
         esac
     elif type lsb_release &> /dev/null; then
         # linuxbase.org
@@ -456,7 +474,7 @@ init() {
 
     # Choose correct package manager for distro
     case "$DISTRO" in
-        ubuntu|debian|linuxmint)
+        ubuntu|debian)
             if command -v apt &> /dev/null; then
                 PKG_MANAGER="apt"
             else
@@ -513,42 +531,54 @@ init() {
     case "$DISTRO" in
         ubuntu|debian|opensuse*)
             if systemctl is-active --quiet apparmor; then
-                printf "%bapparmor.service%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+                printf "%bapparmor.service%b: %brunning%b\n" \
+                    "$YELLOW" "$NC" "$GREEN" "$NC"
                 if command -v aa-status &> /dev/null; then
-                    printf "%apparmor-utils%b: %installed%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+                    printf "%bapparmor-utils%b: %binstalled%b\n" \
+                        "$YELLOW" "$NC" "$GREEN" "$NC"
                 else
-                    printf "%bapparmor-utils%b: %not installed%b\n" "$YELLOW" "$NC" "$RED" "$NC"
+                    printf "%bapparmor-utils%b: %bnot installed%b\n" \
+                        "$YELLOW" "$NC" "$RED" "$NC"
                 fi
             else
-                printf "%bapparmor.service%b: %bnot running%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+                printf "%bapparmor.service%b: %bnot running%b\n" \
+                    "$YELLOW" "$NC" "$GREEN" "$NC"
             fi
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
             if [[ ! -e /sys/fs/selinux/enforce ]]; then
-                printf "%bSELinux%b: %bnot enabled%b\n" "$YELLOW" "$NC" "$RED" "$NC"
+                printf "%bSELinux%b: %bnot enabled%b\n" \
+                    "$YELLOW" "$NC" "$RED" "$NC"
             elif [[ $(cat /sys/fs/selinux/enforce) -eq 1 ]]; then
-                printf "%bSELinux%b: %benforcing%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+                printf "%bSELinux%b: %benforcing%b\n" \
+                    "$YELLOW" "$NC" "$GREEN" "$NC"
             else
-                printf "%bSELinux%b: %bnot enforcing%b\n" "$YELLOW" "$NC" "$RED" "$NC"
+                printf "%bSELinux%b: %bnot enforcing%b\n" \
+                    "$YELLOW" "$NC" "$RED" "$NC"
             fi
             ;;
     esac
 
     if systemctl is-active --quiet auditd; then
-        printf "%bauditd.service%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+        printf "%bauditd.service%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
     else
-        printf "%bauditd.service%b: %bnot running%b\n" "$YELLOW" "$NC" "$RED" "$NC"
+        printf "%bauditd.service%b: %bnot running%b\n" \
+            "$YELLOW" "$NC" "$RED" "$NC"
     fi
 
     if systemctl is-active --quiet dailyaidecheck.timer; then
-        printf "%bdailyaidecheck.timer%b: %brunning%b\n" "$YELLOW" "$NC" "$GREEN" "$NC"
+        printf "%bdailyaidecheck.timer%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
     else
-        printf "%bdailyaidecheck.timer%b: %bnot running%b\n" "$YELLOW" "$NC" "$RED" "$NC"
+        printf "%bdailyaidecheck.timer%b: %bnot running%b\n" \
+            "$YELLOW" "$NC" "$RED" "$NC"
     fi
 
     command -v sudo &> /dev/null || print_status not_installed alert "sudo"
 
-    # Check for duplicate UIDs/GIDs and users/groups, as well as users with passwords
+    # Check for duplicate UIDs/GIDs and users/groups, 
+    # as well as users with passwords
     # CIS Ubuntu 5.4.2 and 7.2
     mapfile -t DUPLICATE_UIDS < <(
         awk -F: '{ print $3 }' /etc/passwd | sort | uniq -d
@@ -573,7 +603,9 @@ init() {
             if [[ "$uid" -eq 0 ]]; then
                 print_status duplicate_found_in alert "UID 0" "/etc/passwd"
             fi
-                awk -F: -v uid="$uid" '($3 == uid) { print "User:", $1, "| UID:", $3 }' /etc/passwd
+                awk -F: -v uid="$uid" \
+                    '($3 == uid) { print "User:", $1, "| UID:", $3 }' \
+                    /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_PRIMARY_GIDS[@]}" -gt 0 ]]; then
@@ -581,9 +613,12 @@ init() {
         local pgid=""
         for pgid in "${DUPLICATE_PRIMARY_GIDS[@]}"; do
             if [[ "$pgid" -eq 0 ]]; then
-                print_status duplicate_found_in alert "Primary GID 0" "/etc/passwd"
+                print_status duplicate_found_in alert \
+                    "Primary GID 0" "/etc/passwd"
             fi
-                awk -F: -v pgid="$pgid" '($4 == pgid) { print "User:", $1, "| GID:", $4 }' /etc/passwd
+                awk -F: -v pgid="$pgid" \
+                    '($4 == pgid) { print "User:", $1, "| GID:", $4 }' \
+                    /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_USERNAMES[@]}" -gt 0 ]]; then
@@ -593,7 +628,9 @@ init() {
             if [[ "$username" = "root" ]]; then
                 print_status duplicate_found_in alert "root" "/etc/passwd"
             fi
-                awk -F: -v username="$username" '($1 == username) { print $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ":" $7 }' /etc/passwd
+                awk -F: -v username="$username" \
+                    '($1 == username) { print $1 ":" $2 ":" $3 ":" $4 ":" $5 ":" $6 ":" $7 }' \
+                    /etc/passwd
         done
     fi
     if [[ "${#DUPLICATE_GIDS[@]}" -gt 0 ]]; then
@@ -603,7 +640,9 @@ init() {
             if [[ "$gid" -eq 0 ]]; then
                 print_status duplicate_found_in alert "GID 0" "/etc/group"
             fi
-                awk -F: -v gid="$gid" '($3 == gid) { print "Group:", $1, "| GID:", $3 }' /etc/group
+                awk -F: -v gid="$gid" \
+                    '($3 == gid) { print "Group:", $1, "| GID:", $3 }' \
+                    /etc/group
         done
     fi
     if [[ "${#DUPLICATE_GROUP_NAMES[@]}" -gt 0 ]]; then
@@ -618,14 +657,14 @@ init() {
     fi
 
     # Checks if users are in the shadow group
-    if [[ "$DISTRO" =~ ^(debian|ubuntu|linuxmint|opensuse.*)$ ]]; then
+    if [[ "$DISTRO" =~ ^(debian|ubuntu|opensuse.*)$ ]]; then
         SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
         echo -e "${GREEN}shadow GID: ${YELLOW}${SHADOW_GID}${NC}"
         mapfile -t SHADOW_PGID < <(
             awk -F: -v SHADOW_GID="$SHADOW_GID" '($4 == SHADOW_GID) { print $1 }' /etc/passwd
         )
         mapfile -t SHADOW_GROUP_MEMBER < <(
-            awk -F: '($1 == "shadow")  { print $4 }' /etc/group
+            awk -F: '($1 == "shadow" && $4 != "")  { print $4 }' /etc/group
         )
         if [[ "${#SHADOW_PGID[@]}" -gt 0 ]]; then
             print_status found_in alert "Users with Primary GID of shadow group" "/etc/passwd"
@@ -645,9 +684,11 @@ init() {
 
     # This keeps a portion of the password section, just so the user can confirm that the script isnt lying
     mapfile -t SHADOW_USERS_REDACTED < <(
-        awk -F: -v OFS=":" '($2 != "" && $2 !~ /^[!*]/) { print $1, substr($2, 1, 10) "...", $3, $4, $5, $6, $7, $8, $9 }' /etc/shadow
+        awk -F: -v OFS=":" \
+            '($2 != "" && $2 !~ /^[!*]/) { print $1, substr($2, 1, 10) "...", $3, $4, $5, $6, $7, $8, $9 }' \
+            /etc/shadow
     )
-    local user=""
+    local user
     echo -e "${YELLOW}Users with password configured in ${CYAN}/etc/shadow: ${NC}"
     for user in "${SHADOW_USERS_REDACTED[@]}"; do
         echo -e "$user"
@@ -699,7 +740,7 @@ check_installed_packages() {
     PACKAGES=()
     local pkg=""
     case $DISTRO in
-        ubuntu|debian|linuxmint)
+        ubuntu|debian)
             local -ar candidate_pkgs=(
                 autofs avahi-daemon isc-dhcp-server bind9 dnsmasq vsftpd slapd
                 dovecot-imapd nfs-kernel-server ypserv cups rpcbind rsync samba
@@ -732,7 +773,7 @@ check_installed_packages() {
             done
             ;;
         *)
-            echo "Package manager not recognized, installed packages must be manually checked."
+            print_status message error "Unrecognized package manager"
             return 1
             ;;
     esac
@@ -747,7 +788,7 @@ ask_to_remove_packages() {
     fi
     echo -e "${BLUE}You will be asked if you want to remove each package${NC}"
     echo -e "${BLUE}look carefully at each, and determine if they are necessary or not.${NC}"
-    local pkg=""
+    local pkg
     for pkg in "${PACKAGES[@]}"; do
         remove_package "$PKG_MANAGER" "$pkg"
     done
@@ -768,7 +809,7 @@ install_recommended_packages() {
         esac
     done
 
-    local pkg=""
+    local pkg
 
     case "$DISTRO" in
         ubuntu|debian)
@@ -987,7 +1028,14 @@ configure_partitions() {
 
 configure_mac() {
     case "$DISTRO" in
-        ubuntu|debian|linuxmint|opensuse*)
+        ubuntu|debian|opensuse*)
+            if ! command -v aa-enforce; then 
+                print_status message_object error command \
+                    "Could not run" "aa-enforce"
+                return 1
+            fi
+            aa-enforce /etc/apparmor.d/* &> /dev/null || true
+            aa-complain /usr/share/apparmor/extra-profiles/* || true
             ;;
         
     esac
@@ -1046,7 +1094,7 @@ configure_permissions() {
         "/etc/gshadow-:f:root:root:0000" # 7.1.8
     )
 
-    if [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|opensuse.*)$ ]]; then
+    if [[ "$DISTRO" =~ ^(ubuntu|debian|opensuse.*)$ ]]; then
         permissions+=("${ubuntu_permissions[@]}")
     elif [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
         permissions+=("${rhel_permissions[@]}")
@@ -1192,7 +1240,7 @@ init_firewall() {
             nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
             if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
                 nft list ruleset > /etc/sysconfig/nftables.conf
-            elif [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|arch)$ ]]; then
+            elif [[ "$DISTRO" =~ ^(ubuntu|debian|arch)$ ]]; then
                 nft list ruleset > /etc/nftables.conf
             else
                 print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
@@ -1473,7 +1521,7 @@ configure_firewall() {
                 nft chain inet filter OUTPUT '{ policy drop; }'
                 if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
                     nft list ruleset > /etc/sysconfig/nftables.conf
-                elif [[ "$DISTRO" =~ ^(ubuntu|debian|linuxmint|arch)$ ]]; then
+                elif [[ "$DISTRO" =~ ^(ubuntu|debian|arch)$ ]]; then
                     nft list ruleset > /etc/nftables.conf
                 else
                     print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
@@ -1514,7 +1562,7 @@ configure_firewall() {
     local active_firewall=""
     if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
         active_firewall="firewalld"
-    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian|linuxmint)$ ]]; then
+    elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
         active_firewall="ufw"
     elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
         active_firewall="nftables"
@@ -1746,7 +1794,7 @@ configure_aide() {
         return 1
     }
     case "$DISTRO" in
-        ubuntu|debian|linuxmint)
+        ubuntu|debian)
             aideinit
             mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
             ;;
@@ -1861,6 +1909,14 @@ configure_grub() {
         return 1
     fi
 
+    if command -v grubby; then
+        grubby --update-kernel ALL --remove-args "selinux=0 enforcing=0"
+        grubby --update-kernel="$(grubby --default-kernel)" \
+            --args="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"
+        print_status message success "Reconfigured GRUB successfully"
+        return 0
+    fi
+
     if grep -q -E '^\s*GRUB_CMDLINE_LINUX="\s*"$' /etc/default/grub; then
         sed -i -E \
             's/^\s*GRUB_CMDLINE_LINUX="\s*"$/GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
@@ -1870,8 +1926,7 @@ configure_grub() {
             's/^\s*(GRUB_CMDLINE_LINUX=".*)"/\1 apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
             /etc/default/grub
     elif ! grep -q -E '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
-        echo GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" \
-            >> /etc/default/grub
+        echo GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" >> /etc/default/grub
     else
         print_status message_alt error \
             "Failed to append to " "/etc/default/grub"
@@ -1879,6 +1934,17 @@ configure_grub() {
         return 1
     fi
 
+    # TODO(michael): Checks for selinux=0|enforcing=0 in grub need to be implemented
+
+    if command -v update-grub; then
+        update-grub
+    elif command -v grub2-mkconfig && [[ -f /boot/grub2/grub.cfg ]]; then
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+    else
+        print_status message error "Please manually run update-grub"
+        return 1
+    fi
+    
     print_status message success "Reconfigured GRUB successfully"
 }
 
@@ -1920,12 +1986,10 @@ main() {
             "install" "Will ask to install possibly helpful packages"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
             "mac" "Not Yet Implemented"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" \
-            "fwinit" "(EXPERIMENTAL)" \
-            "Will initialize the firewall on your system"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${YELLOW}%s${NC} %s\n" \
-            "fwconf" "(EXPERIMENTAL)" \
-            "Will help you configure firewall rules"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "fwinit" "Will initialize the firewall on your system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "fwconf" "Will help you configure firewall rules"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
             "audit" "Will initialize auditd rules"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
@@ -2111,7 +2175,6 @@ main() {
             esac
 
             REPLY=""
-            clear
             break
         done
     done
