@@ -140,16 +140,26 @@ prst_message_object() {
 }
 
 # prst_message with a few quirks
-# Intended as a temporary, hacky workaround solution while other coding tasks are prioritized
+# Intended as a temporary, hacky workaround solution while other coding
+# tasks are prioritized
 # You give it the first portion of the string that you would normally print
-# The second argument should be the rest of the string that you would like to print, though you cannot, since it is with a different color
-# The two strings will then be combined for logging purposes (once logging is implemented)
-# It has no newline character, so from there you would use printf to change the color of the following text
-# Useful for when you may need to use custom colors after a status message, for things like file or directory names
+# The second argument should be the rest of the string that you
+# would like to print, though you cannot, since it is with a different color
+# The two strings will then be combined for logging purposes 
+# (once logging is implemented)
+# It has no newline character, so from there you would use 
+# printf to change the color of the following text
+# Useful for when you may need to use custom colors after a status message,
+# for things like file or directory names
 # Example w/ printf afterwards:
-# print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
-# printf "%b%s%b and %b%s%b\n" "$CYAN" "/etc/nftables.conf" "$NC" "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
-# print_status message_alt "error|warn|info|success" "partial printed text" "logged text"
+# print_status message_alt warn \
+# "Distribution could not be determined, placing in both" \
+# "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
+# printf "%b%s%b and %b%s%b\n" \
+# "$CYAN" "/etc/nftables.conf" "$NC" \
+# "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
+# print_status message_alt "error|warn|info|success" \
+# "partial printed text" "logged text"
 prst_message_alt() {
     case "$1" in
         error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
@@ -367,19 +377,19 @@ install_package() {
             apt install -y "$package_name"
             ;;
         dnf)
-            print_status message info "Using dnf to install ${package_name}"
+            print_status using_to info install "dnf" "$package_name"
             dnf install -y "$package_name"
             ;;
         yum)
-            print_status message info "Using yum to install ${package_name}"
+            print_status using_to info install "yum" "$package_name"
             yum install -y "$package_name"
             ;;
         zypper)
-            print_status message info "Using zypper to install ${package_name}"
+            print_status using_to info install "zypper" "$package_name"
             zypper install -y "$package_name"
             ;;
         pacman)
-            print_status message info "Using pacman to install ${package_name}"
+            print_status using_to info install "pacman" "$package_name"
             pacman -Syu --noconfirm "$package_name"
             ;;
         *)
@@ -409,23 +419,23 @@ remove_package() {
 
     case "$package_manager" in
         apt)
-            echo "Using apt to remove $package_name..."
+            print_status using_to info remove "apt" "$package_name"
             apt remove "$package_name"
             ;;
         dnf)
-            echo "Using dnf to remove $package_name..."
+            print_status using_to info remove "dnf" "$package_name"
             dnf remove "$package_name"
             ;;
         yum)
-            echo "Using yum to remove $package_name..."
+            print_status using_to info remove "yum" "$package_name"
             yum remove "$package_name"
             ;;
         zypper)
-            echo "Using zypper to remove $package_name..."
+            print_status using_to info remove "zypper" "$package_name"
             zypper remove "$package_name"
             ;;
         pacman)
-            echo "Using pacman to remove $package_name..."
+            print_status using_to info remove "pacman" "$package_name"
             pacman -R "$package_name"
             ;;
         *)
@@ -490,9 +500,15 @@ init() {
                 PKG_MANAGER="rpm"
             fi
             ;;
-        opensuse*) PKG_MANAGER="zypper" ;;
-        arch) PKG_MANAGER="pacman" ;;
-        *) PKG_MANAGER="unsupported" ;;
+        opensuse*) 
+            PKG_MANAGER="zypper"
+            ;;
+        arch) 
+            PKG_MANAGER="pacman"
+            ;;
+        *) 
+            PKG_MANAGER="unsupported"
+            ;;
     esac
     printf "%bPackage Manager:%b %s\n" "$GREEN" "$NC" "$PKG_MANAGER"
 
@@ -652,7 +668,8 @@ init() {
             if [[ "$group_name" = "root" ]]; then
                 print_status duplicate_found_in alert "root" "/etc/group"
             fi
-                awk -F: -v group_name="$group_name" '($1 == group_name) { print $1 ":" $2 ":" $3 }' /etc/group
+                awk -F: -v group_name="$group_name" \
+                '($1 == group_name) { print $1 ":" $2 ":" $3 }' /etc/group
         done
     fi
 
@@ -661,20 +678,23 @@ init() {
         SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
         echo -e "${GREEN}shadow GID: ${YELLOW}${SHADOW_GID}${NC}"
         mapfile -t SHADOW_PGID < <(
-            awk -F: -v SHADOW_GID="$SHADOW_GID" '($4 == SHADOW_GID) { print $1 }' /etc/passwd
+            awk -F: -v SHADOW_GID="$SHADOW_GID" \
+                '($4 == SHADOW_GID) { print $1 }' /etc/passwd
         )
         mapfile -t SHADOW_GROUP_MEMBER < <(
             awk -F: '($1 == "shadow" && $4 != "")  { print $4 }' /etc/group
         )
         if [[ "${#SHADOW_PGID[@]}" -gt 0 ]]; then
-            print_status found_in alert "Users with Primary GID of shadow group" "/etc/passwd"
+            print_status found_in alert \
+                "Users with Primary GID of shadow group" "/etc/passwd"
             local user
             for user in "${SHADOW_PGID[@]}"; do
                 printf "%s\n" "$user"
             done
         fi
         if [[ "${#SHADOW_GROUP_MEMBER[@]}" -gt 0 ]]; then
-            print_status found_in alert "Users apart of shadow group" "/etc/group"
+            print_status found_in alert \
+                "Users apart of shadow group" "/etc/group"
             local user
             for user in "${SHADOW_GROUP_MEMBER[@]}"; do
                 printf "%s\n" "$user"
@@ -689,9 +709,12 @@ init() {
             /etc/shadow
     )
     local user
-    echo -e "${YELLOW}Users with password configured in ${CYAN}/etc/shadow: ${NC}"
+    printf "%bUsers with password configuerd in%b %b/etc/shadow%b%b:%b\n" \
+        "$YELLOW" "$NC" \
+        "$CYAN" "$NC" \
+        "$YELLOW" "$NC"
     for user in "${SHADOW_USERS_REDACTED[@]}"; do
-        echo -e "$user"
+        printf "%s\n" "$USER"
     done
 }
 
