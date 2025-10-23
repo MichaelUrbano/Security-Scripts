@@ -1052,13 +1052,27 @@ configure_partitions() {
 configure_mac() {
     case "$DISTRO" in
         ubuntu|debian|opensuse*)
-            if ! command -v aa-enforce; then 
+            if ! command -v aa-enforce; then
                 print_status message_object error command \
                     "Could not run" "aa-enforce"
                 return 1
             fi
             aa-enforce /etc/apparmor.d/* &> /dev/null || true
             aa-complain /usr/share/apparmor/extra-profiles/* || true
+            ;;
+        centos|rocky|almalinux|fedora|rhel|ol)
+            if ! grep -qE '^\s*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config; then
+                sed -i 's/^\s*SELINUXTYPE=.*\b/SELINUXTYPE=targeted/'
+            fi
+            if ! grep -Ei '^\s*SELINUX=(enforcing|permissive)' /etc/selinux/config; then
+                sed -i 's/^\s*SELINUX=.*\b/SELINUX=enforcing/'
+                setenforce 1
+            fi
+            if ps -eZ | grep unconfined_service_t; then
+                print_status message warn \
+                    "Please be aware there are unconfined processes on the system"
+                ps -eZ | grep unconfined_service_t
+            fi
             ;;
         
     esac
@@ -1425,7 +1439,7 @@ configure_firewall() {
             local interface=""
             local interfaces
             mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' | 
-            grep -vE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
+            grep -qvE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
             echo -e "${YELLOW}Interfaces:"
             for interface in "${interfaces[@]}"; do
                 printf "${YELLOW}%s ${NC}" "$interface"
@@ -1927,11 +1941,6 @@ configure_sysctl() {
 
 # Will change boot parameters and ensure MAC is enforced
 configure_grub() {
-    if [[ ! -f /etc/default/grub ]]; then
-        print_status not_found error file "/etc/default/grub"
-        return 1
-    fi
-
     if command -v grubby; then
         grubby --update-kernel ALL --remove-args "selinux=0 enforcing=0"
         grubby --update-kernel="$(grubby --default-kernel)" \
@@ -1940,15 +1949,20 @@ configure_grub() {
         return 0
     fi
 
-    if grep -q -E '^\s*GRUB_CMDLINE_LINUX="\s*"$' /etc/default/grub; then
+    if [[ ! -f /etc/default/grub ]]; then
+        print_status not_found error file "/etc/default/grub"
+        return 1
+    fi
+
+    if grep -qE '^\s*GRUB_CMDLINE_LINUX="\s*"$' /etc/default/grub; then
         sed -i -E \
             's/^\s*GRUB_CMDLINE_LINUX="\s*"$/GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
             /etc/default/grub
-    elif grep -q -E '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+    elif grep -qE '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
         sed -i -E \
             's/^\s*(GRUB_CMDLINE_LINUX=".*)"/\1 apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
             /etc/default/grub
-    elif ! grep -q -E '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+    elif ! grep -qE '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
         echo GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" >> /etc/default/grub
     else
         print_status message_alt error \
@@ -1957,7 +1971,9 @@ configure_grub() {
         return 1
     fi
 
-    # TODO(michael): Checks for selinux=0|enforcing=0 in grub need to be implemented
+    if grep -qE 'selinux=0|enforcing=0' /etc/default/grub; then
+        sed -i 's/\bselinux=0\b//g; s/\benforcing=0\b//g' /etc/default/grub
+    fi
 
     if command -v update-grub; then
         update-grub
@@ -2007,10 +2023,10 @@ main() {
             "remove" "Will ask to remove potentially unwanted packages"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
             "install" "Will ask to install possibly helpful packages"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-            "mac" "Not Yet Implemented"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-            "fwinit" "Will initialize the firewall on your system"
+            "mac" "Will setup AppArmor/SELinux on the system"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "fwinit" "Will initialize the firewall on the system"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
             "fwconf" "Will help you configure firewall rules"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
