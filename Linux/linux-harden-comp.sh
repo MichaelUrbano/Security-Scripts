@@ -600,7 +600,7 @@ init() {
         awk -F: '{ print $3 }' /etc/passwd | sort | uniq -d
     )
     mapfile -t DUPLICATE_PRIMARY_GIDS < <(
-        awk -F: '{ print $4 }' /etc/passwd | sort | uniq -d
+        awk -F: '($4 != 65534) { print $4 }' /etc/passwd | sort | uniq -d
     )
     mapfile -t DUPLICATE_USERNAMES < <(
         awk -F: '{ print $1 }' /etc/passwd | sort | uniq -d
@@ -714,7 +714,7 @@ init() {
         "$CYAN" "$NC" \
         "$YELLOW" "$NC"
     for user in "${SHADOW_USERS_REDACTED[@]}"; do
-        printf "%s\n" "$USER"
+        printf "%s\n" "$user"
     done
 }
 
@@ -1046,7 +1046,11 @@ restore_firewall() {
 configure_partitions() {
     #echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
     #echo "tmpfs /dev/shm tmpfs defaults,nosuid,nodev,noexec 0 0" >> /etc/fstab
-    return 1
+    if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+(\S+)\s+[0-9]+\s+[0-9]+$' /etc/fstab; then # worst line in here
+        printf "There is a /tmp entry in /etc/fstab\n"
+    else
+        echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
+    fi
 }
 
 configure_mac() {
