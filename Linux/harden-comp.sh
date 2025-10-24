@@ -135,6 +135,7 @@ prst_message_object() {
     file) local object="$3" object_color="$CYAN" ;;
     directory) local object="$3" object_color="$MAGENTA" ;;
     command | function) local object="$3" object_color="${YELLOW}${BOLD}" ;;
+    option) local object="$3" object_color="$YELLOW" ;;
     *) local object="$3" object_color="$UC" ;;
   esac
   printf "%b[%s]%b %b%s%b %b%s%b\n" \
@@ -858,12 +859,12 @@ check_installed_packages() {
   esac
 }
 
-# Debian 2.1 & 2.2
+# CIS Ubuntu 2.1 & 2.2
 # Requires user interaction
 ask_to_remove_packages() {
   if [ ${#PACKAGES[@]} -eq 0 ]; then
     echo -e "${RED}There are no packages to remove. (did you run check_installed_packages?)${NC}"
-    return 1
+    return 0
   fi
   echo -e "${BLUE}You will be asked if you want to remove each package${NC}"
   echo -e "${BLUE}look carefully at each, and determine if they are necessary or not.${NC}"
@@ -874,64 +875,62 @@ ask_to_remove_packages() {
 }
 
 install_recommended_packages() {
-  local remote_logging="false"
+  local journal_remote="false"
+  local rsyslog="false"
   local extra_security="false"
   local arg=""
 
   for arg in "$@"; do
     case "$arg" in
-      remote_logging=true) remote_logging="true" ;;
-      remote_logging=false) remote_logging="false" ;;
+      journal_remote=true) journal_remote="true" ;;
+      journal_remote=false) journal_remote="false" ;;
+      rsyslog=true) rsyslog="true" ;;
+      rsyslog=false) rsyslog="false" ;;
       extra_security=true) extra_security="true" ;;
       extra_security=false) extra_security="false" ;;
       *)
-        echo "Unrecognized argument: $arg" >&2
+        print_status message_object error option "Unrecognized option:" "$arg"
         return 1
         ;;
     esac
   done
 
-  local pkg
-
   case "$DISTRO" in
     ubuntu | debian)
-      if [ "$remote_logging" = "true" ]; then
-        for pkg in "rsyslog" "systemd-journal-remote"; do
-          install_package "$PKG_MANAGER" "$pkg"
-        done
-      fi
-      if [ "$extra_security" = "true" ]; then
-        for pkg in "lynis" "clamav" "chkrootkit" "fail2ban"; do
-          install_package "$PKG_MANAGER" "$pkg"
-        done
-      fi
-      for pkg in "sudo" "apparmor" "apparmor-utils" "auditd" "audispd-plugins" "aide" "apparmor-profiles" "apparmor-profiles-extra"; do
-        install_package "$PKG_MANAGER" "$pkg"
-      done
+      local -a packages=(
+        "sudo" "apparmor" "apparmor-utils" "auditd" "audispd-plugins" "aide"
+        "apparmor-profiles" "apparmor-profiles-extra"
+      )
       ;;
     centos | rocky | almalinux | fedora | rhel | ol)
-      if [ "$remote_logging" = "true" ]; then
-        for pkg in "rsyslog" "systemd-journal-remote"; do
-          install_package "$PKG_MANAGER" "$pkg"
-        done
-      fi
-      if [ "$extra_security" = "true" ]; then
-        for pkg in "lynis" "clamav" "chkrootkit" "fail2ban"; do
-          install_package "$PKG_MANAGER" "$pkg"
-        done
-      fi
-      for pkg in "sudo" "libselinux" "audit" "aide" "selinux-policy" "selinux-policy-targeted"; do
-        install_package "$PKG_MANAGER" "$pkg"
-      done
+      local -a packages=(
+        "sudo" "libselinux" "audit" "aide" "selinux-policy"
+        "selinux-policy-targeted"
+      )
       ;;
     *)
-      echo "Unrecognized package manager"
+      print_status message error "Unrecognized package manager"
       return 1
       ;;
   esac
+
+  local pkg
+  if [ "$journal_remote" = "true" ]; then
+    packages+=("systemd-journal-remote")
+  elif [ "$rsyslog" = "true" ]; then
+    packages+=("rsyslog")
+  fi
+  if [ "$extra_security" = "true" ]; then
+    packages+=("lynis" "clamav" "chkrootkit" "fail2ban")
+  fi
+
+  for pkg in "${packages[@]}"; do
+    install_package "$PKG_MANAGER" "$pkg"
+  done
 }
 
-# Basic tar backup function for /etc, /var/www/html, and /opt to directory specified in env ($BAKDIR), defaults to /usr/sbin/ if unspecified
+# Basic tar backup function for /etc, /var/www/html, and /opt 
+# to directory specified in env ($BAKDIR), defaults to /usr/sbin/ if unspecified
 # Will also try to make deleting or modifying backups a little annoying
 # Will put your backups into the child directory <backup_directory>/b4
 backup_directories() {
@@ -977,7 +976,8 @@ backup_directories() {
 
 # Performs a backup of given firewall, putting the backups into /srv/backups
 # It also inserts into the associative array FW_BACKUPS,
-# containing the path of each backup as the key, and the name of the original file as the value
+# containing the path of each backup as the key,
+# and the name of the original file as the value
 # These are meant to be more of a "rollback" than an entire backup
 # They aren't very well protected in comparison to backups by backup_directories
 # May serve as a good IoC if these files suddenly vanish
