@@ -76,7 +76,8 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Set to "true" if you want to ignore the main menu, possibly to run functions directly
+# Set to "true" if you want to ignore the main menu, 
+# possibly to run functions directly
 SKIP_MAIN="false"
 
 # Silently import .env before init even can, in case user set SKIP_MAIN="true"
@@ -543,7 +544,7 @@ init() {
     done
     printf "\n"
 
-    # Check if commands are present, and if their services are enabled
+    # Check if commands are present, and/or if their services are enabled
     case "$DISTRO" in
         ubuntu|debian|opensuse*)
             if systemctl is-active --quiet apparmor; then
@@ -591,7 +592,53 @@ init() {
             "$YELLOW" "$NC" "$RED" "$NC"
     fi
 
-    command -v sudo &> /dev/null || print_status not_installed alert "sudo"
+    local chrony_running="false"
+    local timesyncd_running="false"
+    if systemctl is-active --quiet systemd-timesyncd; then
+        printf "%bsystemd-timesyncd.service%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
+        chrony_running="true"
+    fi
+    if systemctl is-active --quiet chrony; then
+        printf "%bchrony.service%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
+        timesyncd_running="true"
+    fi
+
+    if [[ "$chrony_running" == "true" && "$timesyncd_running" == "true" ]]; then
+        print_status message alert "Multiple NTP clients running"
+    elif [[ "$chrony_running" == "false" && "$timesyncd_running" == "false" ]]; then
+        print_status message alert "No NTP clients found running"
+    fi
+
+    if systemctl is-active --quiet cron &> /dev/null; then
+        printf "%bcron.service%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
+    elif systemctl is-active --quiet crond &> /dev/null; then
+        printf "%bcrond.service%b: %brunning%b\n" \
+            "$YELLOW" "$NC" "$GREEN" "$NC"
+    else
+        print_status message alert "cron service is not running"
+    fi
+
+    # TODO(michael): Add check for su
+    print_status message info "Checking sudo configuration" "(/etc/sudoers)"
+    if ! command -v sudo &> /dev/null; then
+        print_status not_installed alert "sudo"
+    else
+        if ! grep -qrPi -- '^\h*Defaults\h+([^#\n\r]+,\h*)?use_pty\b' /etc/sudoers*; then
+            print_status message_object alert option \
+                "Not set:" "Defaults use_pty"
+        fi
+        if ! grep -qrPsi "^\h*Defaults\h+([^#]+,\h*)?logfile\h*=\h*(\"|\')?\H+(\"|\')?(,\h*\H+\h*)*\h*(#.*)?$" /etc/sudoers*; then
+            print_status message alert \
+                "No custom sudo log file configured"
+        fi
+        if grep -qr "^[^#].*\!authenticate" /etc/sudoers*; then
+            print_status message alert \
+                "sudo reauthentication not required"
+        fi
+    fi
 
     # Check for duplicate UIDs/GIDs and users/groups, 
     # as well as users with passwords
@@ -676,7 +723,6 @@ init() {
     # Checks if users are in the shadow group
     if [[ "$DISTRO" =~ ^(debian|ubuntu|opensuse.*)$ ]]; then
         SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
-        echo -e "${GREEN}shadow GID: ${YELLOW}${SHADOW_GID}${NC}"
         mapfile -t SHADOW_PGID < <(
             awk -F: -v SHADOW_GID="$SHADOW_GID" \
                 '($4 == SHADOW_GID) { print $1 }' /etc/passwd
@@ -776,7 +822,8 @@ check_installed_packages() {
                 tigervnc-standalone-server linuxvnc x11vnc
             )
             for pkg in "${candidate_pkgs[@]}"; do
-                dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
+                { dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } \
+                    || true
             done
             ;;
         centos|rocky|almalinux|fedora|rhel|ol)
@@ -784,15 +831,15 @@ check_installed_packages() {
                 mcstrans setroubleshoot autofs avahi dhcp-server bind dnsmasq
                 samba vsftpd dovecot cyrus-imapd nfs-utils ypserv cups
                 rpcbind rsync-daemon net-snmp telnet-server tftp-server squid
-                httpd nginx xinetd xorg-x11-server-common ftp
-                openldap-clients ypbind telnet tftp
-                @graphical-server-environment @workstation-product-environment
-                netcat nmap-ncat wireshark wireshark-cli tcpdump gcc make rsh
-                rsh-server nmap proftpd pure-ftpd unbound lighttpd
-                tigervnc-server tigervnc-server-minimal
+                httpd nginx xinetd xorg-x11-server-common ftp openldap-clients
+                ypbind telnet tftp @graphical-server-environment
+                @workstation-product-environment netcat nmap-ncat wireshark
+                wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd
+                pure-ftpd unbound lighttpd tigervnc-server
+                tigervnc-server-minimal
             )
             for pkg in "${candidate_pkgs[@]}"; do
-                rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg") || true
+                { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
             done
             ;;
         *)
@@ -1178,7 +1225,6 @@ configure_mac() {
 # 7.1.11 is world writeable files, which need to not exist or have the sticky bit set
 # 7.1.12 is files with no user/group, which should not exist, or should be assigned a user/group
 # 7.1.13 is ensure SUID and SGID files are reviewed, which is done via linpeas.sh
-# 5.1.1-3 is for ssh, not yet implemented
 configure_permissions() {
     # Format for the permissions is the following:
     # path:type:owner:group:mode
@@ -1951,18 +1997,24 @@ configure_clamav() {
 # MANUAL: 1.1.1.10
 # Will disable unnecessary kernel modules
 disable_kernel_modules() {
-    modules=(
+    local -a modules=(
         "cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage"
         "dccp" "tipc" "rds" "sctp"
     )
-    local custom_blacklist="/etc/modprobe.d/custom-blacklist.conf"
-    local mod=""
-    touch "$custom_blacklist"
-
+    local -a extra_modules=(
+        "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
+        "nfs_common" "nfsd" "smbfs_common"
+    )
+    if "$DISTRO" != "ubuntu" && ! command -v snap; then
+        modules+=("squashfs")
+    fi
+    local hardening_blacklist="/etc/modprobe.d/hardening-blacklist.conf"
+    touch "$hardening_blacklist"
+    local mod
     # Check for duplicates entries, then add an entry if it doesn't exist.
     for mod in "${modules[@]}"; do
-        if ! grep -qE "^install[[:space:]]+${mod}[[:space:]]+" "$custom_blacklist"; then
-            echo "install $mod /bin/false" >> "$custom_blacklist"
+        if ! grep -qE "^install\s+${mod}\s+" "$hardening_blacklist"; then
+            echo "install $mod /bin/false" >> "$hardening_blacklist"
         fi
     done
 }
@@ -2133,8 +2185,8 @@ main() {
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
             "perms" \
             "Will change permissions on important files for improved security"
-        printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-            "parts" "Not Yet Implemented"
+        printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+            "parts" "Will set secure mount options on partitions"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
             "modules" "Will disable unnecessary kernel modules"
         printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
