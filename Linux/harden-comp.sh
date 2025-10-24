@@ -52,6 +52,7 @@
 # Run shfmt -i 2 -ci -bn
 
 set -euo pipefail
+set +H
 
 # Set ANSI Escape Code variables for different colors in the terminal, as well as recommended, but not strict, usage of colors.
 readonly RED='\033[0;31m'      # For ERROR or Firewalls
@@ -122,7 +123,8 @@ prst_message() {
 prst_message_object() {
   local input_status="$1"
   local input_object="$2"
-  local input_object="$3"
+  local input_text="$3"
+  local object_text="$4"
   case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
@@ -132,11 +134,11 @@ prst_message_object() {
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
   case "$input_object" in
-    file) local object="$3" object_color="$CYAN" ;;
-    directory) local object="$3" object_color="$MAGENTA" ;;
-    command | function) local object="$3" object_color="${YELLOW}${BOLD}" ;;
-    option) local object="$3" object_color="$YELLOW" ;;
-    *) local object="$3" object_color="$UC" ;;
+    file) local object="$object_text" object_color="$CYAN" ;;
+    directory) local object="$object_text" object_color="$MAGENTA" ;;
+    command | function) local object="$object_text" object_color="${YELLOW}${BOLD}" ;;
+    option) local object="$object_text" object_color="$YELLOW" ;;
+    *) local object="$object_text" object_color="$UC" ;;
   esac
   printf "%b[%s]%b %b%s%b %b%s%b\n" \
     "$status_color" "$status" "$NC" \
@@ -631,7 +633,7 @@ init() {
   if ! command -v sudo &>/dev/null; then
     print_status not_installed alert "sudo"
   else
-    if ! grep -qrPi -- '^\h*Defaults\h+([^#\n\r]+,\h*)?use_pty\b' /etc/sudoers*; then
+    if ! grep -qrPi '^\h*Defaults\h+([^#\n\r]+,\h*)?use_pty\b' /etc/sudoers*; then
       print_status message_object alert option \
         "Not set:" "Defaults use_pty"
     fi
@@ -639,7 +641,7 @@ init() {
       print_status message alert \
         "No custom sudo log file configured"
     fi
-    if grep -qr "^[^#].*\!authenticate" /etc/sudoers*; then
+    if grep -qrE "^[^#].*!authenticate" /etc/sudoers*; then
       print_status message alert \
         "sudo reauthentication not required"
     fi
