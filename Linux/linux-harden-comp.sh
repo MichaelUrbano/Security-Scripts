@@ -1044,12 +1044,99 @@ restore_firewall() {
 # CIS Debian 12: 1.1.2
 # We only want to do /tmp and /dev/shm, any related to /home or /var are out of scope
 configure_partitions() {
+    local tmp_noexec="false"
     #echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
     #echo "tmpfs /dev/shm tmpfs defaults,nosuid,nodev,noexec 0 0" >> /etc/fstab
-    if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+(\S+)\s+[0-9]+\s+[0-9]+$' /etc/fstab; then # worst line in here
-        printf "There is a /tmp entry in /etc/fstab\n"
+    if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+' /etc/fstab; then
+        local -a options
+        local option
+        mapfile -t options < <(
+            sed -nE \
+                's|^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+(\S+)\s*[0-9]*\s*[0-9]*|\1|p' \
+                /etc/fstab \
+                | tr "," "\n"
+        )
+        local nodev="false"
+        local nosuid="false"
+        local noexec="false"
+        for option in "${options[@]}"; do
+            if [[ "$option" == "nodev" ]]; then
+                nodev="true"
+                continue
+            fi
+            if [[ "$option" == "nosuid" ]]; then
+                nosuid="true"
+                continue
+            fi
+            if [[ "$option" == "noexec" ]]; then
+                noexec="true"
+                continue
+            fi
+        done
+        if [[ "$nodev" == "false" ]]; then
+            sed -iE \
+                's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nodev\2|' \
+                /etc/fstab
+        fi
+        if [[ "$nosuid" == "false" ]]; then
+            sed -iE \
+                's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nosuid\2|' \
+                /etc/fstab
+        fi
+        if [[ "$noexec" == "false" && "$tmp_noexec" == "true" ]]; then
+            sed -iE \
+                's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+                /etc/fstab
+        fi
     else
-        echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
+        echo "tmpfs /tmp tmpfs defaults,nodev,nosuid 0 0" >> /etc/fstab
+        if [[ "$tmp_noexec" == "true" ]]; then
+            sed -iE \
+                's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+                /etc/fstab
+        fi
+    fi
+
+    if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+' /etc/fstab; then
+        local -a options
+        local option
+        mapfile -t options < <(
+            sed -nE \
+                's|^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+(\S+)\s*[0-9]*\s*[0-9]*|\1|p' \
+                /etc/fstab \
+                | tr "," "\n"
+        )
+        local nodev="false"
+        local nosuid="false"
+        local noexec="false"
+        for option in "${options[@]}"; do
+            if [[ "$option" == "nodev" ]]; then
+                nodev="true"
+                continue
+            fi
+            if [[ "$option" == "nosuid" ]]; then
+                nosuid="true"
+                continue
+            fi
+            if [[ "$option" == "noexec" ]]; then
+                noexec="true"
+                continue
+            fi
+        done
+        if [[ "$nodev" == "false" ]]; then
+            sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nodev\2|' \
+                /etc/fstab
+        fi
+        if [[ "$nosuid" == "false" ]]; then
+            sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nosuid\2|' \
+                /etc/fstab
+        fi
+        if [[ "$noexec" == "false" ]]; then
+            sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+                /etc/fstab
+        fi
+    else
+        echo "tmpfs /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0" >> /etc/fstab
     fi
 }
 
