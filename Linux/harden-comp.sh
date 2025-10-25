@@ -1254,7 +1254,7 @@ configure_mac() {
 }
 
 # CIS Ubuntu and RHEL
-# 6.1.1.2 is for journald and must be done through 
+# 6.1.1.2 is for journald and must be done through
 # cp /usr/lib/tmpfiles.d/systemd.conf /etc/tmpfiles.d/systemd.conf,
 # not yet implemented
 # 6.1.3.4/6.2.3.4 is for rsyslog, not yet implemented
@@ -1263,7 +1263,7 @@ configure_mac() {
 # 6.3.4 is for auditd, and is not yet implemented
 # 7.1.11 is world writeable files,
 # which need to not exist or have the sticky bit set
-# 7.1.12 is files with no user/group, 
+# 7.1.12 is files with no user/group,
 # which should not exist, or should be assigned a user/group
 # 7.1.13 is ensure SUID and SGID files are reviewed,
 # which is done via linpeas.sh
@@ -1309,6 +1309,38 @@ configure_permissions() {
     "/etc/gshadow:f:root:root:0000"    # 7.1.7
     "/etc/gshadow-:f:root:root:0000"   # 7.1.8
   )
+  # This doesn't check cloud-init.log, localmessages, and waagent.log
+  # SSSD, gdm, and gdm3 are also not checked
+  # Nor are journal files, and all other log files present
+  # Checks for those should eventually be implemented
+  # Additionally these permissions will not last if logs are rotated
+  # (/etc/logrotate.conf and /etc/logrotate.d)
+  # Okay for a competition, not a production system
+  # All other files should be owned by root or syslog (usually)
+  # Group should be root or adm (usually)
+  # Mode should be at least 0640
+  # 6.1.4/6.2.4 perms
+  local -a log_files=(
+    "/var/log/lastlog*:f:root:utmp:0664"
+    "/var/log/wtmp*:f:root:utmp:0664"
+    "/var/log/btmp*:f:root:utmp:0660"
+  )
+  local -ar debian_logging=(
+    "/var/log/auth.log*:f:root:adm:0640"
+    "/var/log/syslog*:f:root:adm:0640"
+  )
+  local -ar ubuntu_logging=(
+    "/var/log/auth.log*:f:syslog:adm:0640"
+    "/var/log/syslog*:f:syslog:adm:0640"
+  )
+  local -ar rhel_logging=(
+    "/var/log/secure*:f:root:root:0600"
+    "/var/log/messages*:f:root:root:0600"
+  )
+  local -ar suse_logging=(
+    "/var/log/secure*:f:root:root:0640"
+    "/var/log/messages*:f:root:root:0640"
+  )
 
   if [[ "$DISTRO" =~ ^(ubuntu|debian|opensuse.*)$ ]]; then
     permissions+=("${ubuntu_permissions[@]}")
@@ -1346,6 +1378,40 @@ configure_permissions() {
   done
 
   local file
+  local wildcard_path
+  # 6.1.4/6.2.4
+  if ! [[ -d /var/log ]]; then
+    print_status not_found alert directory "/var/log"
+    return 1
+  fi
+  case "$DISTRO" in
+    ubuntu)
+      log_files+=( "${ubuntu_logging[@]}" )
+      ;;
+    debian)
+      log_files+=( "${debian_logging[@]}" )
+      ;;
+    centos | rocky | almalinux | fedora | rhel | ol)
+      log_files+=( "${rhel_logging[@]}" )
+      ;;
+    opensuse*)
+      log_files+=( "${suse_logging[@]}" )
+      ;;
+    *)
+      :
+      ;;
+  esac
+
+  shopt -s nullglob # So wildcard paths are interpreted safely
+  for permission in "${log_files[@]}"; do
+    IFS=':' read -r wildcard_path type owner group mode <<<"$permission"
+    for file in $wildcard_path; do
+      [[ -f "$file" ]] || continue
+      chown "${owner}:${group}" "$file" && chmod "$mode" "$file"
+    done
+  done
+  shopt -u nullglob
+
   # 5.1.1
   if [[ -f /etc/ssh/sshd_config ]]; then
     chown root:root /etc/ssh/sshd_config && chmod 0600 /etc/ssh/sshd_config
@@ -2231,7 +2297,7 @@ main() {
   also_do
   init
 
-  [[ -f $HOME/.env ]] && . "$HOME/.env" &>/dev/null \
+  { [[ -f $HOME/.env ]] && . "$HOME/.env" &>/dev/null; } \
     || print_status message info "Couldn't find .env file, skipping..."
   check_installed_packages || print_status unsuccessful_function error \
     "check_installed_packages"
