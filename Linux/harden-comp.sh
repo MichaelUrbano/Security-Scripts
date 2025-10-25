@@ -88,7 +88,12 @@ SKIP_MAIN="false"
 . "$HOME/.env" &>/dev/null || true
 
 # For testing purposes, will execute before init() within main()
-also_do() {
+do_before() {
+  return 0
+}
+
+# For testing purposes, will execute after init() within main()
+do_after() {
   return 0
 }
 
@@ -1633,7 +1638,7 @@ configure_firewall() {
             append=$(echo "$service_name" | cut -d ":" -f 2)
           fi
         done
-      elif [[ "$service" = "q" ]]; then # did they type q to exit?
+      elif [[ "$service" = "q" ]]; then # did they type q talso_doo exit?
         return 0
       else
         echo -e "${RED}Invalid input${NC}"
@@ -1998,10 +2003,14 @@ configure_auditd() {
     print_status message error "Please ensure auditd is installed"
     return 1
   }
-  if [[ -d /etc/audit/rules.d && ! -f /etc/audit/rules.d/99-hardening.rules ]]; then
-    cat <<'EOF' | tee /etc/audit/rules.d/99-hardening.rules
+  if [[ ! -d /etc/audit/rules.d || -f /etc/audit/rules.d/99-hardening.rules ]]; then
+    print_status message error \
+      "auditd directory may not exist, or rules may already exist."
+    return 1
+  fi
+
+  cat <<'EOF' | tee /etc/audit/rules.d/99-hardening.rules
 # These rules were added by Michael's Linux Hardening Script
-# These rules are based off ones provided by the CIS Security benchmarks
 
 # 6.2.3.1/6.3.3.1
 -w /etc/sudoers -p wa -k scope
@@ -2021,19 +2030,12 @@ configure_auditd() {
 -a always,exit -F arch=b32 -S clock_settime -F a0=0x0 -k time-change
 -w /etc/localtime -p wa -k time-change
 
-# 6.2.3.5/6.3.3.5
+# 6.2.3.5/6.3.3.5 (partial)
 -a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale
 -a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale
 -w /etc/issue -p wa -k system-locale
 -w /etc/issue.net -p wa -k system-locale
 -w /etc/hosts -p wa -k system-locale
--w /etc/networks -p wa -k system-locale
--w /etc/network -p wa -k system-locale
--w /etc/netplan -p wa -k system-locale
--w /etc/hostname -p wa -k system-locale
--w /etc/sysconfig/network -p wa -k system-locale
--w /etc/sysconfig/network-scripts/ -p wa -k system-locale
--w /etc/NetworkManager -p wa -k system-locale
 
 # 6.2.3.6/6.3.3.6
 # Not yet implemented
@@ -2079,12 +2081,6 @@ configure_auditd() {
 -a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
 -a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
 
-# 6.2.3.14/6.3.3.14
--w /etc/apparmor/ -p wa -k MAC-policy
--w /etc/apparmor.d/ -p wa -k MAC-policy
--w /etc/selinux -p wa -k MAC-policy
--w /usr/share/selinux -p wa -k MAC-policy
-
 # 6.2.3.15/6.3.3.15
 -a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
 
@@ -2099,17 +2095,65 @@ configure_auditd() {
 
 # 6.2.3.19/6.3.3.19
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
+EOF
+  case "$DISTRO" in
+    ubuntu | debian)
+      tee -a /etc/audit/rules.d/99-hardening.rules <<'EOF'
+# 6.2.3.5 (Ubuntu)
+-w /etc/networks -p wa -k system-locale
+-w /etc/network -p wa -k system-locale
+-w /etc/netplan -p wa -k system-locale
 
+# 6.2.3.14 (Ubuntu)
+-w /etc/apparmor/ -p wa -k MAC-policy
+-w /etc/apparmor.d/ -p wa -k MAC-policy
+
+# 6.2.3.20
+-e 2
+EOF
+      ;;
+    centos | rocky | almalinux | fedora | rhel | ol)
+      tee -a /etc/audit/rules.d/99-hardening.rules <<'EOF'
+# 6.3.3.5 (RHEL)
+-w /etc/hostname -p wa -k system-locale
+-w /etc/sysconfig/network -p wa -k system-locale
+-w /etc/sysconfig/network-scripts/ -p wa -k system-locale
+-w /etc/NetworkManager -p wa -k system-locale
+
+# 6.3.3.14 (RHEL)
+-w /etc/selinux -p wa -k MAC-policy
+-w /usr/share/selinux -p wa -k MAC-policy
+
+# 6.3.3.20
+-e 2
+EOF
+      ;;
+    opensuse*)
+      tee -a /etc/audit/rules.d/99-hardening.rules <<'EOF'
+# 6.3.3.5 (SUSE)
+-w /etc/hostname -p wa -k system-locale
+-w /etc/sysconfig/network -p wa -k system-locale
+-w /etc/sysconfig/network-scripts/ -p wa -k system-locale
+-w /etc/NetworkManager -p wa -k system-locale
+
+# 6.3.3.14 (SUSE)
+-w /etc/apparmor/ -p wa -k MAC-policy
+-w /etc/apparmor.d/ -p wa -k MAC-policy
+
+# 6.3.3.20
+-e 2
+EOF
+      ;;
+    *)
+      tee -a /etc/audit/rules.d/99-hardening.rules <<'EOF'
 # 6.2.3.20/6.3.3.20
 -e 2
 EOF
-    augenrules --load
-    augenrules --check
-    systemctl enable --now auditd
-  else
-    echo -e "${RED}Please ensure the directory ${MAGENTA}/etc/audit/rules.d ${RED}exists.${NC}"
-    return 1
-  fi
+      ;;
+  esac
+  augenrules --load
+  augenrules --check
+  systemctl enable --now auditd
 }
 
 configure_aide() {
@@ -2151,10 +2195,10 @@ disable_kernel_modules() {
     "cramfs" "freevxfs" "hfs" "hfsplus" "jffs2" "udf" "usb-storage"
     "dccp" "tipc" "rds" "sctp"
   )
-  local -a extra_modules=(
-    "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
-    "nfs_common" "nfsd" "smbfs_common"
-  )
+#  local -a extra_modules=(
+#    "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
+#    "nfs_common" "nfsd" "smbfs_common"
+#  )
   if "$DISTRO" != "ubuntu" && ! command -v snap; then
     modules+=("squashfs")
   fi
@@ -2294,8 +2338,9 @@ configure_authentication() {
 # Will present the main menu
 main() {
   clear
-  also_do
+  do_before
   init
+  do_after
 
   { [[ -f $HOME/.env ]] && . "$HOME/.env" &>/dev/null; } \
     || print_status message info "Couldn't find .env file, skipping..."
