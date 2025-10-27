@@ -772,7 +772,7 @@ init() {
       /etc/shadow
   )
   local user
-  printf "%bUsers with password configuerd in%b %b/etc/shadow%b%b:%b\n" \
+  printf "%bUsers with password configured in%b %b/etc/shadow%b%b:%b\n" \
     "$YELLOW" "$NC" \
     "$CYAN" "$NC" \
     "$YELLOW" "$NC"
@@ -1135,12 +1135,14 @@ configure_partitions() {
   local tmp_noexec="false"
   #echo "tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0" >> /etc/fstab
   #echo "tmpfs /dev/shm tmpfs defaults,nosuid,nodev,noexec 0 0" >> /etc/fstab
-  if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+' /etc/fstab; then
+  if grep -qE \
+    '^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+' \
+    /etc/fstab; then
     local -a options
     local option
     mapfile -t options < <(
       sed -nE \
-        's|^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+(\S+)\s*[0-9]*\s*[0-9]*|\1|p' \
+        's|^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+([^[:space:]]+)[[:blank:]]*[0-9]*[[:blank:]]*[0-9]*|\1|p' \
         /etc/fstab \
         | tr "," "\n"
     )
@@ -1163,34 +1165,34 @@ configure_partitions() {
     done
     if [[ "$nodev" == "false" ]]; then
       sed -iE \
-        's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nodev\2|' \
+        's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,nodev\2|' \
         /etc/fstab
     fi
     if [[ "$nosuid" == "false" ]]; then
       sed -iE \
-        's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nosuid\2|' \
+        's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,nosuid\2|' \
         /etc/fstab
     fi
     if [[ "$noexec" == "false" && "$tmp_noexec" == "true" ]]; then
       sed -iE \
-        's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+        's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,noexec\2|' \
         /etc/fstab
     fi
   else
     echo "tmpfs /tmp tmpfs defaults,nodev,nosuid 0 0" >>/etc/fstab
     if [[ "$tmp_noexec" == "true" ]]; then
       sed -iE \
-        's|(^\s*[^#\s][^\s]*\S+\s+\/tmp\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+        's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/tmp[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,noexec\2|' \
         /etc/fstab
     fi
   fi
 
-  if grep -qE '^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+' /etc/fstab; then
+  if grep -qE '^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/dev\/shm[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+' /etc/fstab; then
     local -a options
     local option
     mapfile -t options < <(
       sed -nE \
-        's|^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+(\S+)\s*[0-9]*\s*[0-9]*|\1|p' \
+        's|^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/dev\/shm[[:blank:]]+[^[:space:]]+[[:blank:]]+([^[:space:]]+)[[:blank:]]*[0-9]*[[:blank:]]*[0-9]*|\1|p' \
         /etc/fstab \
         | tr "," "\n"
     )
@@ -1212,15 +1214,15 @@ configure_partitions() {
       fi
     done
     if [[ "$nodev" == "false" ]]; then
-      sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nodev\2|' \
+      sed -iE 's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/dev\/shm[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,nodev\2|' \
         /etc/fstab
     fi
     if [[ "$nosuid" == "false" ]]; then
-      sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,nosuid\2|' \
+      sed -iE 's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/dev\/shm[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,nosuid\2|' \
         /etc/fstab
     fi
     if [[ "$noexec" == "false" ]]; then
-      sed -iE 's|(^\s*[^#\s][^\s]*\S+\s+\/dev\/shm\s+\S+\s+\S+)(\s*[0-9]*\s*[0-9]*)|\1,noexec\2|' \
+      sed -iE 's|(^[[:blank:]]*[^#[[:blank:]]][^[[:blank:]]]*[^[:space:]]+[[:blank:]]+\/dev\/shm[[:blank:]]+[^[:space:]]+[[:blank:]]+[^[:space:]]+)([[:blank:]]*[0-9]*[[:blank:]]*[0-9]*)|\1,noexec\2|' \
         /etc/fstab
     fi
   else
@@ -1240,11 +1242,11 @@ configure_mac() {
       aa-complain /usr/share/apparmor/extra-profiles/* || true
       ;;
     centos | rocky | almalinux | fedora | rhel | ol)
-      if ! grep -qE '^\s*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config; then
-        sed -i 's/^\s*SELINUXTYPE=.*\b/SELINUXTYPE=targeted/'
+      if ! grep -qE '^[[:blank:]]*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config; then
+        sed -iE 's/^[[:blank:]]*SELINUXTYPE=.*\b/SELINUXTYPE=targeted/'
       fi
-      if ! grep -Ei '^\s*SELINUX=(enforcing|permissive)' /etc/selinux/config; then
-        sed -i 's/^\s*SELINUX=.*\b/SELINUX=enforcing/'
+      if ! grep -qEi '^[[:blank:]]*SELINUX=(enforcing|permissive)' /etc/selinux/config; then
+        sed -iE 's/^[[:blank:]]*SELINUX=.*\b/SELINUX=enforcing/'
         setenforce 1
       fi
       if ps -eZ | grep unconfined_service_t; then
@@ -1999,16 +2001,105 @@ configure_firewall() {
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
-  command -v auditctl || {
+  if ! command -v auditctl; then
     print_status message error "Please ensure auditd is installed"
     return 1
-  }
+  fi
+  if [[ ! -f /etc/audit/auditd.conf ]]; then
+    print_status not_found error file "/etc/audit/auditd.conf"
+    return 1
+  fi
   if [[ ! -d /etc/audit/rules.d || -f /etc/audit/rules.d/99-hardening.rules ]]; then
-    print_status message error \
-      "auditd directory may not exist, or rules may already exist."
+    print_status not_found error directory "/etc/audit/rules.d"
+    return 1
+  fi
+  if [[ -f /etc/audit/rules.d/99-hardening.rules ]]; then
+    print_status already_exists error file "99-hardening.rules"
     return 1
   fi
 
+  # 6.2.2 (Ubuntu), 6.3.2 (RHEL)
+  print_status message_object info file "Configuring" "/etc/audit/auditd.conf"
+  if grep -qE \
+    "^[[:blank:]]*max_log_file[[:blank:]]+=[[:blank:]]+[0-9]+$" \
+    /etc/audit/auditd.conf; then
+    if ! grep -qE \
+      "^[[:blank:]]*max_log_file[[:blank:]]+=[[:blank:]]+([8-9]|[1-9][0-9]{1,2}|1000)$" \
+      /etc/audit/auditd.conf; then
+      sed -iE \
+        's/^[[:blank:]]*max_log_file[[:blank:]]+=[[:blank:]]+[0-9]+$/max_log_file = 8/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "max_log_file = 8" >> /etc/audit/auditd.conf
+  fi
+  if grep -qiE \
+    "^[[:blank:]]*max_log_file_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$" \
+    /etc/audit/auditd.conf; then
+    if ! grep -qiE \
+      "^[[:blank:]]*max_log_file_action[[:blank:]]+=[[:blank:]]+keep_logs$" \
+      /etc/audit/auditd.conf; then
+      sed -iE \
+        's/^[[:blank:]]*max_log_file_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$/max_log_file_action = keep_logs/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "max_log_file_action = keep_logs" >> /etc/audit/auditd.conf
+  fi
+  # We explicitly do not follow the CIS Security Benchmark recommendations here,
+  # disk_full_action = halt|single results in a loss of availability
+  if grep -qiE \
+    "^[[:blank:]]*disk_full_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$"; then
+    if ! grep -qiE \
+      "^[[:blank:]]*disk_full_action[[:blank:]]+=[[:blank:]]+(syslog|rotate)$"; then
+      sed -iE \
+        's/^[[:blank:]]*disk_full_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$/disk_full_action = rotate/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "disk_full_action = rotate" >> /etc/audit/auditd.conf
+  fi
+  if grep -qiE \
+    "^[[:blank:]]*disk_error_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$"; then
+    if ! grep -qiE \
+      "^[[:blank:]]*disk_error_action[[:blank:]]+=[[:blank:]]+syslog$"; then
+      sed -iE \
+        's/^[[:blank:]]*disk_error_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$/disk_error_action = syslog/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "disk_error_action = syslog" >> /etc/audit/auditd.conf
+  fi
+  # Once again explicitly not following CIS Security Benchmarks
+  # space_left_action|admin_space_left_action = halt|single
+  # Either values result in a loss of availability.
+  if grep -qiE \
+    "^[[:blank:]]*space_left_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$"; then
+    if ! grep -qiE \
+      "^[[:blank:]]*space_left_action[[:blank:]]+=[[:blank:]]+(email|rotate)$"; then
+      sed -iE \
+        's/^[[:blank:]]*space_left_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$/space_left_action = email/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "space_left_action = email" >> /etc/audit/auditd.conf
+  fi
+  if grep -qiE \
+    "^[[:blank:]]*admin_space_left_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$"; then
+    if ! grep -qiE \
+      "^[[:blank:]]*admin_space_left_action[[:blank:]]+=[[:blank:]]+(email|rotate)$"; then
+      sed -iE \
+        's/^[[:blank:]]*admin_space_left_action[[:blank:]]+=[[:blank:]]+[[:word:]]+$/admin_space_left_action = email/' \
+        /etc/audit/auditd.conf
+    fi
+  else
+    echo "admin_space_left_action = email" >> /etc/audit/auditd.conf
+  fi
+  print_status message_object success file \
+    "Finished configuring" "/etc/audit/auditd.conf"
+
+  print_status message_object info file \
+    "Adding rules to" "/etc/audit/rules.d/99-hardening.rules"
   cat <<'EOF' | tee /etc/audit/rules.d/99-hardening.rules
 # These rules were added by Michael's Linux Hardening Script
 
@@ -2095,6 +2186,7 @@ configure_auditd() {
 
 # 6.2.3.19/6.3.3.19
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
+
 EOF
   case "$DISTRO" in
     ubuntu | debian)
@@ -2156,6 +2248,10 @@ EOF
   systemctl enable --now auditd
 }
 
+configure_logging() {
+  return 0
+}
+
 configure_aide() {
   command -v aide &>/dev/null || {
     print_status message error "Please ensure AIDE is installed."
@@ -2207,7 +2303,7 @@ disable_kernel_modules() {
   local mod
   # Check for duplicates entries, then add an entry if it doesn't exist.
   for mod in "${modules[@]}"; do
-    if ! grep -qE "^install\s+${mod}\s+" "$hardening_blacklist"; then
+    if ! grep -qE "^install[[:blank:]]+${mod}[[:blank:]]+" "$hardening_blacklist"; then
       echo "install $mod /bin/false" >>"$hardening_blacklist"
     fi
   done
@@ -2294,15 +2390,15 @@ configure_grub() {
     return 1
   fi
 
-  if grep -qE '^\s*GRUB_CMDLINE_LINUX="\s*"$' /etc/default/grub; then
+  if grep -qE '^[[:blank:]]*GRUB_CMDLINE_LINUX="[[:blank:]]*"$' /etc/default/grub; then
     sed -i -E \
-      's/^\s*GRUB_CMDLINE_LINUX="\s*"$/GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
+      's/^[[:blank:]]*GRUB_CMDLINE_LINUX="[[:blank:]]*"$/GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
       /etc/default/grub
-  elif grep -qE '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+  elif grep -qE '^[[:blank:]]*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
     sed -i -E \
-      's/^\s*(GRUB_CMDLINE_LINUX=".*)"/\1 apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
+      's/^[[:blank:]]*(GRUB_CMDLINE_LINUX=".*)"/\1 apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"/' \
       /etc/default/grub
-  elif ! grep -qE '^\s*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
+  elif ! grep -qE '^[[:blank:]]*GRUB_CMDLINE_LINUX=".*"$' /etc/default/grub; then
     echo GRUB_CMDLINE_LINUX="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192" >>/etc/default/grub
   else
     print_status message_alt error \
@@ -2424,15 +2520,16 @@ main() {
         install | i)
           local option_one
           local option_two
+          local remote_logging="journal_remote"
           while true; do
-            read -rp "Install remote logging packages? (y/n): " \
+            read -rp "Install systemd-journal-remote? (y/n): " \
               option_one
             case $option_one in
               y)
                 option_one="true" && break
                 ;;
               n)
-                option_one="false" && break
+                remote_logging="rsyslog" && break
                 ;;
               *)
                 printf "${RED}%s${NC}\n" \
@@ -2440,6 +2537,25 @@ main() {
                 ;;
             esac
           done
+
+          if [[ "$remote_logging" == "rsyslog" ]]; then
+            while true; do
+              read -rp "Install rsyslog instead? (y/n): " \
+                option_one
+              case $option_one in
+                y)
+                  option_one="true" && break
+                  ;;
+                n)
+                  option_one="false" && break
+                  ;;
+                *)
+                  printf "${RED}%s${NC}\n" \
+                    "Unrecognized option, try again"
+                  ;;
+              esac
+            done
+          fi
 
           while true; do
             read -rp "Install extra security packages? (y/n): " \
@@ -2459,7 +2575,7 @@ main() {
           done
 
           install_recommended_packages \
-            "remote_logging=$option_one" \
+            "${remote_logging}=${option_one}" \
             "extra_security=$option_two" \
             || print_status unsuccessful_function error \
               "install_recommended_packages"
