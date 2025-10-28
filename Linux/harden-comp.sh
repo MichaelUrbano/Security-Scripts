@@ -471,7 +471,7 @@ init() {
         ;;
       *)
         DISTRO=${ID_LIKE%% *}
-        VER="unknown-version"
+        VER="?"
         ;;
     esac
   elif type lsb_release &>/dev/null; then
@@ -832,7 +832,7 @@ check_installed_packages() {
         dovecot-imapd nfs-kernel-server ypserv cups rpcbind rsync samba
         snmpd tftpd-hpa squid apache2 nginx xinetd xserver-common nis
         rsh-client talk telnet inetutils-telnet ldap-utils ftp tnftp
-        prelink apport gnome gdm3 netcat-openbsd netcat-traditional
+        prelink apport gnome gdm3 bluez netcat-openbsd netcat-traditional
         ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap
         proftpd pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd
         unbound lighttpd vnc-server tightvncserver
@@ -1936,7 +1936,7 @@ configure_firewall() {
     imaps:993/tcp
     pops:995/tcp
     mysql:3306/tcp
-    rdp:3389/tcp # udp also exists
+    rdp:3389/tcp # udp also valid
     vnc:5900/tcp
   )
 
@@ -2283,6 +2283,9 @@ configure_clamav() {
   return 1
 }
 
+configure_sudo() {
+  return 1
+}
 # CIS Ubuntu 12: 1.1.1.1-5,8-9, 3.2
 # 1.1.1.10 to be added
 # Will disable unnecessary kernel modules
@@ -2372,7 +2375,7 @@ configure_sysctl() {
     return 1
   fi
   # Disable core dumps
-  echo "* hard core 0" >"$limits_file"
+  echo "* hard core 0" > "$limits_file"
 }
 
 # Will change boot parameters and ensure MAC is enforced
@@ -2451,44 +2454,58 @@ main() {
     printf "${GREEN}%s${NC}\n" \
       "Welcome to Michael's Linux Hardening Script (Competition Edition)"
     printf "${GREEN}%s${NC}\n" \
+      "Options are organized into the sections Tools, Packages, Quick, and Heavy"
+    printf "${GREEN}%s${NC}\n" \
       "Enter the name of an option below:"
+
+    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+      "Tools" "Useful for operation of the script"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "backup" "Will back up \"important directories\""
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "upgrade" "Will upgrade your system"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "remove" "Will ask to remove potentially unwanted packages"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "install" "Will ask to install possibly helpful packages"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "mac" "Will setup AppArmor/SELinux on the system"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "fwinit" "Will initialize the firewall on the system"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "fwconf" "Will help you configure firewall rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "audit" "Will initialize auditd rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "aide" "Will initialize AIDE (may take awhile)"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-      "fail" "Not Yet Implemented"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-      "clam" "Not Yet Implemented"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "grub" "Will configure bootloader parameters"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "perms" \
-      "Will change permissions on important files for improved security"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "parts" "Will set secure mount options on partitions"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "modules" "Will disable unnecessary kernel modules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "sysctl" "Will reconfigure sysctl parameters for improved security"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "init" "Show inital information gathered at beginning of the script"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "exit" "Quit program"
+      "exit" "Exit program"
+
+    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+      "Packages" "Automated upgrades, removals, and installations"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "upgrade" "Upgrades the system"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "remove" "Asks to remove potentially unwanted packages"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "install" "Asks to install potentially helpful packages"
+
+    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+      "Quick" "Run instantly + don't require package installs (usually)"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "grub" "Configures bootloader parameters"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "perms" \
+      "Reconfigures permissions for files and directories"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "parts" "Sets secure mount options for partitions"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "modules" "Disables unused kernel modules"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "sysctl" "Reconfigures kernel parameters"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "mac" "Sets up AppArmor/SELinux"
+
+    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+      "Heavy" "May require package installs"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "fwinit" "Initializes the firewall on the system"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "fwconf" "Helps you configure in/out firewall rules"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "audit" "Initializes auditd configuration and rules"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "aide" "Initializes AIDE (may take awhile)"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+      "clam" "Not Yet Implemented: Initializes and configures ClamAV"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+      "fail" "Not Yet Implemented: Helps you configure fail2ban"
     printf "\n"
 
     while true; do
@@ -2663,6 +2680,7 @@ main() {
           clear
           init
           read -rp "Press enter to continue "
+          { [[ -f $HOME/.env ]] && . "$HOME/.env" &>/dev/null; } || :
           ;;
         exit | quit | q | ex) exit 0 ;;
         *)
