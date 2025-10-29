@@ -460,6 +460,7 @@ remove_package() {
 
 # Checks system information and sets up global variables needed for functions
 init() {
+  print_status message info "Checking system information..."
   # Determine distro being used
   if [ -f /etc/os-release ]; then
     # freedesktop.org
@@ -556,19 +557,13 @@ init() {
   done
   printf "\n"
 
+  print_status message info "Checking which services are enabled"
   # Check if commands are present, and/or if their services are enabled
   case "$DISTRO" in
     ubuntu | debian | opensuse*)
       if systemctl is-active --quiet apparmor; then
         printf "%bapparmor.service%b: %brunning%b\n" \
           "$YELLOW" "$NC" "$GREEN" "$NC"
-        if command -v aa-status &>/dev/null; then
-          printf "%bapparmor-utils%b: %binstalled%b\n" \
-            "$YELLOW" "$NC" "$GREEN" "$NC"
-        else
-          printf "%bapparmor-utils%b: %bnot installed%b\n" \
-            "$YELLOW" "$NC" "$RED" "$NC"
-        fi
       else
         printf "%bapparmor.service%b: %bnot running%b\n" \
           "$YELLOW" "$NC" "$GREEN" "$NC"
@@ -587,6 +582,40 @@ init() {
       fi
       ;;
   esac
+
+  if systemctl is-active --quiet systemd-journald; then
+    printf "%bsystemd-journald.service%b: %brunning%b\n" \
+      "$YELLOW" "$NC" "$GREEN" "$NC"
+  else
+    printf "%bsystemd-journald.service%b: %bnot running%b\n" \
+      "$YELLOW" "$NC" "$RED" "$NC"
+  fi
+
+  local journal_upload_running="false"
+  local rsyslog_running="false"
+  if systemctl is-active --quiet systemd-journal-upload; then
+    printf "%bsystemd-journal-upload.service%b: %brunning%b\n" \
+      "$YELLOW" "$NC" "$GREEN" "$NC"
+    journal_upload_running="true"
+  else
+    printf "%bsystemd-journal-upload.service%b: %bnot running%b\n" \
+      "$YELLOW" "$NC" "$RED" "$NC"
+  fi
+
+  if systemctl is-active --quiet rsyslog; then
+    printf "%brsyslog.service%b: %brunning%b\n" \
+      "$YELLOW" "$NC" "$GREEN" "$NC"
+    rsyslog_running="true"
+  else
+    printf "%brsyslog.service%b: %bnot running%b\n" \
+      "$YELLOW" "$NC" "$RED" "$NC"
+  fi
+
+  if [[ "$journal_upload_running" == "true" && "$rsyslog_running" == "true" ]]; then
+    print_status message warn "Multiple remote logging services running"
+  elif [[ "$journal_upload_running" == "false" && "$rsyslog_running" == "false" ]]; then
+    print_status message warn "No remote logging services found running"
+  fi
 
   if systemctl is-active --quiet auditd; then
     printf "%bauditd.service%b: %brunning%b\n" \
@@ -836,7 +865,7 @@ check_installed_packages() {
         ncat wireshark tshark tcpdump gcc make rsh-server telnetd nmap
         proftpd pure-ftpd inetutils-inetd openbsd-inetd rinetd rlinetd
         unbound lighttpd vnc-server tightvncserver
-        tigervnc-standalone-server linuxvnc x11vnc
+        tigervnc-standalone-server linuxvnc x11vnc cockpit
       )
       for pkg in "${candidate_pkgs[@]}"; do
         { dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } \
@@ -850,10 +879,10 @@ check_installed_packages() {
         rpcbind rsync-daemon net-snmp telnet-server tftp-server squid
         httpd nginx xinetd xorg-x11-server-common ftp openldap-clients
         ypbind telnet tftp @graphical-server-environment
-        @workstation-product-environment netcat nmap-ncat wireshark
+        @workstation-product-environment bluez netcat nmap-ncat wireshark
         wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd
         pure-ftpd unbound lighttpd tigervnc-server
-        tigervnc-server-minimal
+        tigervnc-server-minimal cockpit
       )
       for pkg in "${candidate_pkgs[@]}"; do
         { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
@@ -934,6 +963,10 @@ install_recommended_packages() {
   for pkg in "${packages[@]}"; do
     install_package "$PKG_MANAGER" "$pkg"
   done
+}
+
+download_software() {
+  return 1
 }
 
 # Basic tar backup function for /etc, /var/www/html, and /opt 
