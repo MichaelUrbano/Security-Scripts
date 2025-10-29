@@ -879,7 +879,7 @@ check_installed_packages() {
         rpcbind rsync-daemon net-snmp telnet-server tftp-server squid
         httpd nginx xinetd xorg-x11-server-common ftp openldap-clients
         ypbind telnet tftp @graphical-server-environment
-        @workstation-product-environment bluez netcat nmap-ncat wireshark
+        @workstation-product-environment gdm bluez netcat nmap-ncat wireshark
         wireshark-cli tcpdump gcc make rsh rsh-server nmap proftpd
         pure-ftpd unbound lighttpd tigervnc-server
         tigervnc-server-minimal cockpit
@@ -888,8 +888,22 @@ check_installed_packages() {
         { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
       done
       ;;
+    opensuse*)
+      local -ar candidate_pkgs=(
+        autofs avahi dhcp-server bind dnsmasq samba openldap2 vsftpd dovecot
+        cyrus-imapd nfs-kernel-server ypserv cups rpcbind rsync net-snmp
+        telnet-server tftp-server squid apache2 nginx xinetd xorg-x11-server
+        xorg-x11-server* ftp openldap2-client openldap2_5 ypbind telnet tftp
+        gnome gnome_x11 gdm bluez netcat-openbsd busybox-netcat wireshark
+        tcpdump gcc make mrsh mrsh-server nmap proftpd pure-ftpd rinetd xinetd
+        unbound lighttpd tigervnc x11vnc xorg-x11-Xvnc wayvnc cockpit
+      )
+      for pkg in "${candidate_pkgs[@]}"; do
+        { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
+      done
+      ;;
     *)
-      print_status message error "Unrecognized package manager"
+      print_status message error "Unsupported package manager"
       return 1
       ;;
   esac
