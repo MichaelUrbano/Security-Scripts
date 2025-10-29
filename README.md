@@ -1,8 +1,17 @@
 # Security Scripts
 
-These scripts are actively being worked on, if you would like to get the only one currently present in the repository:
+These scripts are actively being worked on, if you would like to gain access to the most recent commits, run
 
-`wget https://raw.githubusercontent.com/MichaelUrbano/Security-Scripts/refs/heads/main/Linux/harden-comp.sh`
+`git clone https://github.com/MichaelUrbano/Security-Scripts.git`
 
-The following environment variables can be set, which can be set either in a file called .env at /root/.env, or by passing them directly into the script:
-- `BAKDIR`: Will change the directory used for backups. Backups will be placed within a child directory (`b4`), located in your specified directory.
+Otherwise, download a .tar.xz archive from the Releases page (There are not currently any releases)
+
+## harden-comp.sh
+If you would like to run this script, under `Linux/harden-comp`, run:
+
+`chmod +x harden-comp.sh`
+`sudo ./harden-comp.sh`
+
+or
+
+`sudo bash harden-comp.sh`

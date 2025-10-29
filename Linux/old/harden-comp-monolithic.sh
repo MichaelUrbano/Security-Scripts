@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# PLEASE NOTE:
+# "Legacy" version of the script, before functions were placed into multiple separate shell scripts
+
 # CIS DEBIAN 12 SECTIONS:
 # 1: Initial Setup
 # 2: Services
