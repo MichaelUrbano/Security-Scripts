@@ -1,3 +1,31 @@
+just_clear() {
+  return 1
+}
+
+prompt_clear() {
+  return 1
+}
+
+check_cron() {
+  return 1
+}
+
+check_ntp() {
+  return 1
+}
+
+check_mac() {
+  return 1
+}
+
+check_logging() {
+  return 1
+}
+
+check_uesrs_and_groups() {
+  return 1
+}
+
 # Checks system information and sets up global variables needed for functions
 init() {
   print_status message info "Checking system information..."

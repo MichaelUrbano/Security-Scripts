@@ -148,8 +148,8 @@ check_installed_packages() {
         tigervnc-standalone-server linuxvnc x11vnc cockpit
       )
       for pkg in "${candidate_pkgs[@]}"; do
-        { dpkg-query -s "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } \
-          || true
+        { dpkg-query -s "$pkg" &> /dev/null && PACKAGES+=("$pkg"); } \
+          || :
       done
       ;;
     centos | rocky | almalinux | fedora | rhel | ol)
@@ -165,7 +165,7 @@ check_installed_packages() {
         tigervnc-server-minimal cockpit
       )
       for pkg in "${candidate_pkgs[@]}"; do
-        { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
+        { rpm -q "$pkg" &> /dev/null && PACKAGES+=("$pkg"); } || :
       done
       ;;
     opensuse*)
@@ -179,7 +179,7 @@ check_installed_packages() {
         unbound lighttpd tigervnc x11vnc xorg-x11-Xvnc wayvnc cockpit
       )
       for pkg in "${candidate_pkgs[@]}"; do
-        { rpm -q "$pkg" &>/dev/null && PACKAGES+=("$pkg"); } || true
+        { rpm -q "$pkg" &> /dev/null && PACKAGES+=("$pkg"); } || :
       done
       ;;
     *)
@@ -193,7 +193,8 @@ check_installed_packages() {
 # Requires user interaction
 ask_to_remove_packages() {
   if [ ${#PACKAGES[@]} -eq 0 ]; then
-    echo -e "${RED}There are no packages to remove. (did you run check_installed_packages?)${NC}"
+    print_status message warn \
+      "There are no packages to remove (Did you use -P by accident?)"
     return 0
   fi
   echo -e "${BLUE}You will be asked if you want to remove each package${NC}"
@@ -212,12 +213,24 @@ install_recommended_packages() {
 
   for arg in "$@"; do
     case "$arg" in
-      journal_remote=true) journal_remote="true" ;;
-      journal_remote=false) journal_remote="false" ;;
-      rsyslog=true) rsyslog="true" ;;
-      rsyslog=false) rsyslog="false" ;;
-      extra_security=true) extra_security="true" ;;
-      extra_security=false) extra_security="false" ;;
+      journal_remote=true) 
+        journal_remote="true"
+        ;;
+      journal_remote=false)
+        journal_remote="false"
+        ;;
+      rsyslog=true)
+        rsyslog="true"
+        ;;
+      rsyslog=false)
+        rsyslog="false"
+        ;;
+      extra_security=true)
+        extra_security="true"
+        ;;
+      extra_security=false)
+        extra_security="false"
+        ;;
       *)
         print_status message_object error option "Unrecognized option:" "$arg"
         return 1
