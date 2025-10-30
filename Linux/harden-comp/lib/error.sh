@@ -1,7 +1,22 @@
 #!/bin/bash
 
+# The following status messages are available
+# print_status message status "text"
+# print_status message_object status object "text" "object"
+# print_status message_alt status
+# print_status not_found status object "path"
+# print_status already_exists status
+# print_status using_to status
+# print_status not_installed status
+# print_status invalud_input status
+# print_status unrecognized_option status
+# print_status found_in status
+# print_status duplicate_found_in status
+# print_status unsuccessful_function status 
+
+
 # Helper function to print status messages
-# print_status "message|not_found" "error|warn|info|success" "..."
+# print_status status_message status "..."
 print_status() {
   local name="$1"
   shift
@@ -54,28 +69,15 @@ prst_message_object() {
     "$object_color" "$object" "$NC"
 }
 
-# prst_message with a few quirks
-# Intended as a temporary, hacky workaround solution while other coding
-# tasks are prioritized
-# You give it the first portion of the string that you would normally print
-# The second argument should be the rest of the string that you
-# would like to print, though you cannot, since it is with a different color
-# The two strings will then be combined for logging purposes
-# (once logging is implemented)
-# It has no newline character, so from there you would use
-# printf to change the color of the following text
-# Useful for when you may need to use custom colors after a status message,
-# for things like file or directory names
-# Example w/ printf afterwards:
-# print_status message_alt warn \
-# "Distribution could not be determined, placing in both" \
-# "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
-# printf "%b%s%b and %b%s%b\n" \
-# "$CYAN" "/etc/nftables.conf" "$NC" \
-# "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
-# print_status message_alt "error|warn|info|success" \
-# "partial printed text" "logged text"
-prst_message_alt() {
+# Will replace prst_message_alt
+prst_message_multiobject() {
+  return 0
+}
+
+# Not found status message
+# print_status not_found status object "path"
+prst_not_found() {
+  local path="$3"
   case "$1" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
@@ -84,74 +86,44 @@ prst_message_alt() {
     alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
-  printf "%b[%s]%b %b%s%b" \
-    "$status_color" "$status" "$NC" \
-    "$text_color" "$2" "$NC"
-}
-
-# Not found status message
-# print_status not_found "error|warn" "file|directory|*" "path"
-prst_not_found() {
   case "$2" in
-    file)
-      case "$1" in
-        error)
-          printf "%b[ERROR]%b %bfile not found:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "${CYAN}${BOLD}" "$2" "$NC"
-          ;;
-        warn)
-          printf "%b[ERROR]%b %bfile not found:%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$NC" "${CYAN}${BOLD}" "$2" "$NC"
-          ;;
-      esac
-      ;;
-
-    directory)
-      case "$1" in
-        error)
-          printf "%b[ERROR]%b %bdirectory not found:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "${MAGENTA}${BOLD}" "$2" "$NC"
-          ;;
-        warn)
-          printf "%b[WARN]%b %bdirectory not found:%b %b%s%b\n" "$WC" "$NC" "$YELLOW" "$NC" "${MAGENTA}${BOLD}" "$2" "$NC"
-          ;;
-      esac
-      ;;
-
-    *)
-      printf "not found: %s\n" "$2"
-      ;;
+    file) local object="file" object_color="${CYAN}${BOLD}" ;;
+    directory) local object="directory" object_color="${MAGENTA}${BOLD}" ;;
+    command) local object="command" object_color="${YELLOW}${BOLD}" ;;
+    *) local object="$2" object_color="${UC}${BOLD}" ;;
   esac
+  printf "%b[%s]%b %b%s not found:%b %b%s%b\n" \
+    "$status_color" "$status" "$NC" \
+    "$text_color" "$object" "$NC" \
+    "$object_color" "$path" "$NC"
 }
 
 # Already Exists status message
 # print_status already_exists "error|warn" "file|directory|*" "path" "kind|rude"
 prst_already_exists() {
-  case "$2" in
-    file)
-      case "$1" in
-        error)
-          printf "%b[ERROR]%b %bfile already exists:%b %b%s%b%b" "$EC" "$NC" "$RED" "$NC" "${CYAN}${BOLD}" "$3" "$NC" "$RED"
-          ;;
-        warn)
-          printf "%b[ERROR]%b %bfile already exists:%b %b%s%b%b" "$WC" "$NC" "$YELLOW" "$NC" "${CYAN}${BOLD}" "$3" "$NC" "$YELLOW"
-          ;;
-      esac
-      ;;
-    directory)
-      case "$1" in
-        error)
-          printf "%b[ERROR]%b %bdirectory already exists:%b %b%s%b%b" "$EC" "$NC" "$RED" "$NC" "${MAGENTA}${BOLD}" "$3" "$NC" "$RED"
-          ;;
-        warn)
-          printf "%b[WARN]%b %bdirectory already exists:%b %b%s%b%b" "$WC" "$NC" "$YELLOW" "$NC" "${MAGENTA}${BOLD}" "$3" "$NC" "$YELLOW"
-          ;;
-      esac
-      ;;
-    *)
-      printf "not found: %s\n" "$3"
-      ;;
+  local path="$3"
+  case "$1" in
+    error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+    warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+    info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+    success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+    alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+    *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
+  case "$2" in
+    file) local object="file" object_color="${CYAN}${BOLD}" ;;
+    directory) local object="directory" object_color="${MAGENTA}${BOLD}" ;;
+    command) local object="command" object_color="${YELLOW}${BOLD}" ;;
+    *) local object="$2" object_color="${UC}${BOLD}" ;;
+  esac
+  printf "%b[%s]%b %b%s already exists:%b %b%s%b%b" \
+    "$status_color" "$status" "$NC" \
+    "$text_color" "$object" "$NC" \
+    "$object_color" "$path" "$NC" "$text_color"
   case "$4" in
-    kind) printf ", Please remove it if you would like to try again\n" ;;
-    rude | *) printf "\n" ;;
+    kind) printf ", Please remove it if you would like to try again%b\n" \
+      "$NC" ;;
+    rude | *) printf "%b\n" "$NC" ;;
   esac
 }
 
@@ -261,10 +233,46 @@ prst_unsuccessful_function() {
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
     success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+    alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
   printf "%b[%s]%b %b%s%b %bdid not complete successfully%b\n" \
     "$status_color" "$status" "$NC" \
     "${YELLOW}${BOLD}" "$2" "$NC" \
     "$text_color" "$NC"
+}
+
+# prst_message with a few quirks
+# Intended as a temporary, hacky workaround solution while other coding
+# tasks are prioritized
+# You give it the first portion of the string that you would normally print
+# The second argument should be the rest of the string that you
+# would like to print, though you cannot, since it is with a different color
+# The two strings will then be combined for logging purposes
+# (once logging is implemented)
+# It has no newline character, so from there you would use
+# printf to change the color of the following text
+# Useful for when you may need to use custom colors after a status message,
+# for things like file or directory names
+# Example w/ printf afterwards:
+# print_status message_alt warn \
+# "Distribution could not be determined, placing in both" \
+# "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
+# printf "%b%s%b and %b%s%b\n" \
+# "$CYAN" "/etc/nftables.conf" "$NC" \
+# "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
+# print_status message_alt "error|warn|info|success" \
+# "partial printed text" "logged text"
+prst_message_alt() {
+  case "$1" in
+    error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
+    warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
+    info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
+    success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
+    alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
+    *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
+  esac
+  printf "%b[%s]%b %b%s%b" \
+    "$status_color" "$status" "$NC" \
+    "$text_color" "$2" "$NC"
 }

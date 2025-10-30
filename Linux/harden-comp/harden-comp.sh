@@ -240,16 +240,32 @@ check_root
 
 override() {
   if [[ -n "$ARG_DISTRO" ]]; then
+    print_status message_object alert option \
+      "Overriding distribution ID:" "$ARG_DISTRO"
     DISTRO="$ARG_DISTRO"
   fi
   if [[ -n "$ARG_VER" ]]; then
+    print_status message_object alert option \
+      "Overriding distribution version:" "$ARG_VER"
     VER="$ARG_VER"
   fi
   if [[ -n "$ARG_PM" ]]; then
+    print_status message_object alert option \
+      "Overriding package manager:" "$ARG_PM"
     PKG_MANAGER="$ARG_PM"
   fi
   if [[ -n "$ARG_FW" ]]; then
+    print_status message_object alert option \
+      "Overriding firewall:" "$ARG_FW"
     FIREWALLS=("$ARG_FW")
+  fi
+  if [[ -n "$ARG_DIRECTORY" ]]; then
+    print_status message_object info directory \
+      "Backup directory set:" "$ARG_DIRECTORY"
+  fi
+  if [[ -n "$ARG_SUBDIRECTORY" ]]; then
+    print_status message_object info directory \
+      "Backup subdirectory set:" "$ARG_SUBDIRECTORY"
   fi
 }
 
@@ -287,6 +303,8 @@ main() {
       "backup" "Will back up \"important directories\""
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "init" "Show inital information gathered at beginning of the script"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+      "pms" "Not Yet Implemented: Poor Man's SIEM"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "exit" "Exit program"
 
@@ -298,6 +316,8 @@ main() {
       "remove" "Asks to remove potentially unwanted packages"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "install" "Asks to install potentially helpful packages"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "download" "Asks to download potentially helpful software"
 
     printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
       "Quick" "Run instantly + don't require package installs (usually)"
@@ -423,6 +443,11 @@ main() {
               "install_recommended_packages"
           option_one=""
           option_two=""
+          ;;
+        download | d)
+          download_software \
+          || print_status unsuccessful_function error \
+            "download_software"
           ;;
         mac)
           configure_mac \

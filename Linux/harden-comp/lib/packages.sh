@@ -253,6 +253,12 @@ install_recommended_packages() {
         "selinux-policy-targeted"
       )
       ;;
+    opensuse*)
+      local -a packages=(
+        "sudo" "apparmor-parser" "apparmor-profiles" "apparmor-utils"
+        "libapparmor1" "audit" "aide"
+      )
+      ;;
     *)
       print_status message error "Unrecognized package manager"
       return 1
@@ -275,5 +281,21 @@ install_recommended_packages() {
 }
 
 download_software() {
-  return 1
+  if command -v wget; then
+    wget -qO ./tools/linpeas.sh \
+      "https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh"
+    wget -qO ./tools/maldetect-current.tar.gz \
+      "https://www.rfxn.com/downloads/maldetect-current.tar.gz"
+    print_status message_object success command "Downloaded files with" "wget"
+  elif command -v curl; then
+    curl -sOJ \
+      https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh \
+      --output-dir ./tools
+    curl -sOJ \
+      https://www.rfxn.com/downloads/maldetect-current.tar.gz \
+      --output-dir ./tools
+    print_status message_object success command "Downloaded files with" "curl"
+  else
+    print_status message error "Ensure you have wget or curl installed"
+  fi
 }
