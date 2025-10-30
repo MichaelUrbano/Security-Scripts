@@ -1,8 +1,10 @@
-just_clear() {
+#!/bin/bash
+
+jclr() {
   return 1
 }
 
-prompt_clear() {
+pclr() {
   return 1
 }
 

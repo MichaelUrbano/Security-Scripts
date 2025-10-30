@@ -1,3 +1,5 @@
+#!/bin/bash
+
 install_package() {
   local package_manager="$1"
   if [[ -z "$package_manager" ]]; then

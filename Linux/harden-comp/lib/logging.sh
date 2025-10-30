@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
   if ! command -v auditctl; then

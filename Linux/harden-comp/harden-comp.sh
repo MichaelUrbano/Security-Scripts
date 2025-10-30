@@ -37,6 +37,16 @@ readonly IC="${BLUE}${BOLD}"   # [INFO]
 readonly SC="${GREEN}${BOLD}"  # [SUCCESS]
 readonly UC="\033[1;4;43;31m"  # [UNKNOWN]
 
+# For testing purposes, will execute before init() within main()
+do_before() {
+  return 0
+}
+
+# For testing purposes, will execute after init() within main()
+do_after() {
+  return 0
+}
+
 check_root() {
   if [ "$EUID" -ne 0 ]; then
     printf \
@@ -228,21 +238,28 @@ check_root
 . ./lib/permissions.sh
 . ./lib/not-yet-implemented.sh
 
-# For testing purposes, will execute before init() within main()
-do_before() {
-  return 0
+override() {
+  if [[ -n "$ARG_DISTRO" ]]; then
+    DISTRO="$ARG_DISTRO"
+  fi
+  if [[ -n "$ARG_VER" ]]; then
+    VER="$ARG_VER"
+  fi
+  if [[ -n "$ARG_PM" ]]; then
+    PKG_MANAGER="$ARG_PM"
+  fi
+  if [[ -n "$ARG_FW" ]]; then
+    FIREWALLS=("$ARG_FW")
+  fi
 }
 
-# For testing purposes, will execute after init() within main()
-do_after() {
-  return 0
-}
 
 # Will present the main menu
 main() {
   do_before
   init
   do_after
+  override
 
   if [[ "$SKIP_PKG_CHK" == "true" ]]; then
     print_status message info "Skipping potentially unwanted package checks"
@@ -320,7 +337,7 @@ main() {
       read -rp "Enter an option: "
       case $REPLY in
         backup | b)
-          backup_directories \
+          backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
             || print_status unsuccessful_function error \
               "backup_directories"
           ;;

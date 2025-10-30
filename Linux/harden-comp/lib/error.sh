@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Helper function to print status messages
 # print_status "message|not_found" "error|warn|info|success" "..."
 print_status() {
