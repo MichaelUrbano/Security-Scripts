@@ -1,58 +1,26 @@
 #!/bin/bash
 
-# CIS DEBIAN 12 SECTIONS:
-# 1: Initial Setup
-# 2: Services
-# 3: Network
-# 4: Host Based Firewall
-# 5: Access Control
-# 6: Logging and Auditing
-# 7: System Maintenance
-
-# Ignored CIS Debian 12: 1.1.1.10, 1.2.1, 1.2.2 (partially), 1.6.1-3, 2.3, 2.4.1.8, 2.4.2
-# Explanation: They are far too manual of processes to be included in the script in a meaningful way.
-
-# Ignored CIS Debian 12: 1.7.2-10
-# Explanation: You should not have a DE installed on a server, it presents a wider attack surface. GNOME + GDM should be removed
-
-# Ignored CIS Debian 12: 3.1.2-3
-# Explanation: Likely out of scope for competitions
-
-# Ignored CIS Debian 12: 3.3.1-2, 3.3.5-6, 3.3.7 (partially), 3.3.8, 3.3.11
-# Explanation: Could likely cause issues if VMs are in the cloud. That and I don't understand networking enough to change these with confidence
-
-# Ignored CIS Debian 12: 5.1.2-22
-# Explanation: SSH is typically nuked, so little focus will be put into configuring sshd
-
-# Ignored CIS Debian 12: 5.2.2-7
-# Explanation: Configuration of /etc/sudoers may vary in-between systems, so it won't be touched at the moment.
-
-# Ignored CIS Debian 12: 5.3, 5.4.1
-# Explanation: They are password hardening related, typically don't need to change for competitions(?)
-
-# TODO: please implement 2.1.22 in some way (ss -tulpn)
-# TODO: 7.1.13 could likely be implemented via linpeas.sh
-
-# TODO: (5.4.2)
-
-# TODO: (5.4.3.1, 5.4.3.2-3(?))
-
-# TODO: (6.1.1, 6.1.4), (6.1.2-3 (maybe))
-
-# TODO: auditd autoconfig (6.2), including adding .rules files to /etc/audit/rules.d/ (specified in 6.2.3)
-
-# TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
-
-# TODO: Get helper functions for implementing colors into printf statements
-# TODO: Create error functions
-# TODO: Use printf instead of echo where appropriate
-# TODO: Implement a logging system
-
 # Want to get close to Google's styleguide?
 # Run shfmt -i 2 -ci -bn
 
+# Check ./lib/not-yet-implemented for TODOs
+
 set -euo pipefail
 set +H
+
+SCRIPT_VERSION="0.0.0-not-yet-versioned"
+ARG_DIRECTORY=""
+ARG_SUBDIRECTORY=""
+ARG_DISTRO=""
+ARG_FW=""
+ARG_PM=""
+ARG_VER=""
+
+# Set to "true" if you want to ignore the main menu,
+# possibly to run functions directly
+SKIP_MAIN="false"
+# Set to "true" if you don't want to check for PUPs
+SKIP_PKG_CHK="false"
 
 # Set ANSI Escape Code variables for different colors in the terminal
 readonly RED='\033[0;31m'      # For ERROR or Firewalls
@@ -69,18 +37,187 @@ readonly IC="${BLUE}${BOLD}"   # [INFO]
 readonly SC="${GREEN}${BOLD}"  # [SUCCESS]
 readonly UC="\033[1;4;43;31m"  # [UNKNOWN]
 
-# Check root
-if [ "$EUID" -ne 0 ]; then
-  printf \
-    "%bThis script must be run as%b %broot%b%b, or with%b %bsudo%b%b.%b\n" \
-    "$YELLOW" "$NC" \
-    "${RED}${BOLD}" "$NC" \
-    "$YELLOW" "$NC" \
-    "${RED}${BOLD}" "$NC" \
-    "$YELLOW" "$NC"
-  exit 1
-fi
+check_root() {
+  if [ "$EUID" -ne 0 ]; then
+    printf \
+      "%bThis script must be run as%b %broot%b%b, or with%b %bsudo%b%b.%b\n" \
+      "$YELLOW" "$NC" \
+      "${RED}${BOLD}" "$NC" \
+      "$YELLOW" "$NC" \
+      "${RED}${BOLD}" "$NC" \
+      "$YELLOW" "$NC"
+    exit 1
+  fi
+}
 
+# Check for OPTIONS passed
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h | --help)
+      cat << EOF
+Usage: sudo ./harden-comp.sh [OPTIONS]...
+Hardening and utility script for competitions
+
+OPTIONS:
+  -b, --backup DIRECTORY    send backups to/check for backups in DEST/b4
+                              (default /usr/bin)
+  -B, --backup-subdirectory DIRECTORY
+                            change backup subdirectory
+                              (default /b4)
+  -d, --distro DIST         override distribution
+  -e, --no-errfail          will set +e on the script, preventing the script
+                              from exiting on any non-zero status (DANGEROUS)
+  -f, --firewall FW         override firewall
+  -i, --init                show information from init() function, then exit
+  -p, --pkg-manager PM      override package manager
+  -P, --skip-pkg-chk        skips check_installed_packages() inside of main()
+  -q, --quick               run all options under Quick, then exit
+  -s, --skip-main           skips main() function
+  -V, --distro-version VER  override distribution version
+  -x, --xtrace              will set -x on the script, for debugging
+  -h, --help                display this help and exit
+      --version             output version information and exit
+
+EXAMPLES:
+  Set full backup directory as /srv/backups/b4
+  sudo ./harden-comp.sh --backup /srv/backups
+
+  Set backup directory as /srv/backups and backup subdirectory as /alt
+  sudo ./harden-comp.sh -b /srv/backups -B /alt
+
+  Set backup directory as /backups and backup subdirectory as /alt and set -x
+  sudo ./harden-comp.sh --backup /backups -B /alt -x
+
+  Set full backup directory as /usr/bin/alt and override firewall to nftables
+  sudo ./harden-comp.sh --backup-subdir /alt -f nftables
+
+  Set backup directory as /backups and backup subdirectory as /net and skip main
+  sudo ./harden-comp.sh -b /backups --backup-subdir /net -s
+
+  Override distribution to fedora, package manager to yum, and firewall to ufw
+  sudo ./harden-comp.sh -d fedora -p yum -f ufw
+
+Short options or long options can be used exclusively, or combined,
+both forms are considered valid by the script.
+
+The DIST argument can be ubuntu, debian, opensuse, centos, rocky, almalinux,
+fedora, rhel, ol, or arch.
+Otherwise the script will attempt to automatically determine what the system's
+distribution is.
+
+The FW argument can be firewalld, ufw, nftables, or iptables.
+Otherwise the script will attempt to automatically determine what firewall the
+system is using.
+
+The PM argument can be apt, dnf, yum, zypper, or pacman.
+Otherwise the script will attempt to automatically determine what
+package manager the system is using.
+
+The VER argument is an integer or float, which must be positive, and
+greater than or equal to 0.
+Otherwise the script will attempt to automatically determine what your
+distribution version is.
+
+Exit status:
+ 0  if OK,
+ 1  if any problems occur.
+
+From Security-Scripts, by Michael Urbano.
+For more information, please visit GitHub.
+<https://github.com/MichaelUrbano/Security-Scripts>.
+Report bugs, vulnerabilties, or other issues to git@michaelurbano.com
+EOF
+      exit 0
+      ;;
+    --version)
+      printf "%s\n" "$SCRIPT_VERSION"
+      exit 0
+      ;;
+    -b | --backup)
+      if [[ -z "$2" && "$2" == -* ]]; then
+        printf "Error: DIRECTORY must be provided\n"
+        exit 1
+      # Valid directory starting with /, not starting directories
+      # with -, is less than 255 characters, and ends without a trailing /
+      elif [[ ! "$2" =~ ^(\/[A-Za-z0-9._][A-Za-z0-9._-]{0,254})+$ ]]; then
+        printf "Error: DIRECTORY must start with / and not end with /\n"
+        exit 1
+      elif [[ ! -d "$2" ]]; then
+        printf "Error: %s not found\n" "$2"
+        exit 1
+      else
+        ARG_DIRECTORY="$2"
+      fi
+      shift 2
+      ;;
+    -B | --backup-subdirectory)
+      if [[ -z "$2" && "$2" == -* ]]; then
+        printf "Error: DIRECTORY must be provided\n"
+        exit 1
+      elif [[ "$2" =~ \/\.{1,2} ]]; then
+        printf "Error: DIRECTORY cannot be /. or /..\n"
+        exit 1
+      elif [[ ! "$2" =~ ^(\/[A-Za-z0-9._][A-Za-z0-9._-]{0,254})+$ ]]; then
+        printf "Error: DIRECTORY must start with / and not end with /\n"
+        exit 1
+      else
+        ARG_SUBDIRECTORY="$2"
+      fi
+      shift 2
+      ;;
+    -d | --distro)
+      ARG_DISTRO="$2"
+      shift 2
+      ;;
+    -e | --no-errfail)
+      set +e
+      shift
+      ;;
+    -f | --firewall)
+      ARG_FW="$2"
+      shift 2
+      ;;
+    -i | --init)
+      check_root
+      . ./lib/error.sh
+      . ./lib/initialization.sh
+      init
+      exit 0
+      ;;
+    -p | --pkg-manager)
+      ARG_PM="$2"
+      shift 2
+      ;;
+    -P | --skip-pkg-chk)
+      SKIP_PKG_CHK="true"
+      shift
+      ;;
+    -q | --quick)
+      :
+      exit 0
+      ;;
+    -s | --skip-main)
+      SKIP_MAIN="true"
+      shift
+      ;;
+    -V | --distro-version)
+      ARG_VER="$2"
+      shift 2
+      ;;
+    -x | --xtrace)
+      set -x
+      shift
+      ;;
+    *)
+      printf "Usage: sudo ./harden-comp.sh [OPTIONS]...\n"
+      printf "Try './harden-comp.sh -h' for more information.\n"
+      exit 1
+  esac
+done
+
+check_root
+
+# source scripts from ./lib
 . ./lib/initialization.sh
 . ./lib/backup.sh
 . ./lib/error.sh
@@ -89,10 +226,7 @@ fi
 . ./lib/logging.sh
 . ./lib/packages.sh
 . ./lib/permissions.sh
-
-# Set to "true" if you want to ignore the main menu,
-# possibly to run functions directly
-SKIP_MAIN="false"
+. ./lib/not-yet-implemented.sh
 
 # For testing purposes, will execute before init() within main()
 do_before() {
@@ -104,35 +238,19 @@ do_after() {
   return 0
 }
 
-configure_fail2ban() {
-  return 1
-}
-
-configure_clamav() {
-  return 1
-}
-
-configure_sudo() {
-  return 1
-}
-
-configure_sshd() {
-  return 1
-}
-
-configure_authentication() {
-  return 1
-}
-
 # Will present the main menu
 main() {
-  clear
   do_before
   init
   do_after
 
-  check_installed_packages || print_status unsuccessful_function error \
-    "check_installed_packages"
+  if [[ "$SKIP_PKG_CHK" == "true" ]]; then
+    print_status message info "Skipping potentially unwanted package checks"
+    PACKAGES=()
+  else
+    check_installed_packages || print_status unsuccessful_function error \
+      "check_installed_packages"
+  fi
   if [[ "${#PACKAGES[@]}" -gt 0 ]]; then
     print_status message warn \
       "Potentially unwanted packages found, run remove/r to review them"
@@ -368,9 +486,16 @@ main() {
           clear
           init
           read -rp "Press enter to continue "
-          { [[ -f $HOME/.env ]] && . "$HOME/.env" &>/dev/null; } || :
           ;;
-        exit | quit | q | ex) exit 0 ;;
+        exit | quit | q | ex) 
+          exit 0
+          ;;
+        bash)
+          clear
+          print_status message info \
+            "Placing you into a bash shell... Use ctrl + d/exit to exit"
+          bash
+          ;;
         *)
           printf "${RED}%s${NC}\n" "Unrecognized option, try again"
           REPLY=""

@@ -3,7 +3,7 @@
 # Will also try to make deleting or modifying backups a little annoying
 # Will put your backups into the child directory <backup_directory>/b4
 backup_directories() {
-  local backup_directory="${BAKDIR:-/usr/sbin}"
+  local backup_directory="${BAKDIR:-/usr/bin}"
   if [ ! -d "$backup_directory" ]; then
     print_status message error "Backup directory does not exist"
     return 1
@@ -53,7 +53,7 @@ backup_directories() {
 # backup_firewall "firewalld|ufw|nftables|iptables" "backup_name"
 backup_firewall() {
   mkdir -p /srv/backups
-  FW_BACKUPS=()
+  declare -gA FW_BACKUPS=()
   case "$1" in
     firewalld)
       local backup_name

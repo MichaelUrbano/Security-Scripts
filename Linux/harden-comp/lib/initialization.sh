@@ -2,7 +2,7 @@
 init() {
   print_status message info "Checking system information..."
   # Determine distro being used
-  if [ -f /etc/os-release ]; then
+  if [[ -f /etc/os-release ]]; then
     # freedesktop.org
     . /etc/os-release
     case "$ID" in
@@ -19,12 +19,12 @@ init() {
     # linuxbase.org
     DISTRO=$(lsb_release -si)
     VER=$(lsb_release -sr)
-  elif [ -f /etc/lsb-release ]; then
+  elif [[ -f /etc/lsb-release ]]; then
     # For some versions of Debian/Ubuntu without lsb_release command
     . /etc/lsb-release
     DISTRO=$DISTRIB_ID
     VER=$DISTRIB_RELEASE
-  elif [ -f /etc/debian_version ]; then
+  elif [[ -f /etc/debian_version ]]; then
     # Older Debian/Ubuntu/etc.
     DISTRO=Debian
     VER=$(cat /etc/debian_version)
@@ -42,6 +42,7 @@ init() {
       if command -v apt &>/dev/null; then
         PKG_MANAGER="apt"
       else
+        print_status message alert "Using dpkg instead of apt"
         PKG_MANAGER="dpkg"
       fi
       ;;
@@ -51,6 +52,7 @@ init() {
       elif command -v yum &>/dev/null; then
         PKG_MANAGER="yum"
       else
+        print_status message alert "Using rpm instead of dnf or yum"
         PKG_MANAGER="rpm"
       fi
       ;;
@@ -68,7 +70,6 @@ init() {
 
   # Find firewalls installed on the system
   FIREWALLS=()
-  declare -gA FW_BACKUPS=()
 
   # firewalld
   if command -v firewall-cmd &>/dev/null; then
@@ -221,6 +222,7 @@ init() {
     fi
   fi
 
+  print_status message info "Checking user and group configurations"
   # Check for duplicate UIDs/GIDs and users/groups,
   # as well as users with passwords
   # CIS Ubuntu 5.4.2 and 7.2
