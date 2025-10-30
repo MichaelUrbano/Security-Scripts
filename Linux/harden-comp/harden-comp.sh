@@ -305,6 +305,8 @@ main() {
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "fwconf" "Helps you configure in/out firewall rules"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+      "logs" "Initializes and configures journald or rsyslog"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "audit" "Initializes auditd configuration and rules"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
       "aide" "Initializes AIDE (may take awhile)"
@@ -421,6 +423,48 @@ main() {
             || print_status unsuccessful_function error \
               "configure_firewall"
           ;;
+        logs)
+          local option_one="false"
+          local option_two="false"
+          while true; do
+            read -rp "Configure systemd-journal-remote? (y/n): " \
+              option_one
+            case $option_one in
+              y)
+                option_one="true" && break
+                ;;
+              n)
+                break
+                ;;
+              *)
+                printf "${RED}%s${NC}\n" \
+                  "Unrecognized option, try again"
+                ;;
+            esac
+          done
+
+          if [[ "$option_one" == "false" ]]; then
+            while true; do
+              read -rp "Configure rsyslog for remote logging instead? (y/n): " \
+                option_two
+              case $option_two in
+                y)
+                  option_two="true" && break
+                  ;;
+                n)
+                  break
+                  ;;
+                *)
+                  printf "${RED}%s${NC}\n" \
+                    "Unrecognized option, try again"
+                  ;;
+              esac
+            done
+          fi
+          configure_logging journal_remote="$option_one" rsyslog="$option_two" \
+            || print_status unsuccessful_function error \
+              "configure_logging"
+          ;;
         audit)
           configure_auditd \
             || print_status unsuccessful_function error \
@@ -494,7 +538,7 @@ main() {
           clear
           print_status message info \
             "Placing you into a bash shell... Use ctrl + d/exit to exit"
-          bash
+          bash -l
           ;;
         *)
           printf "${RED}%s${NC}\n" "Unrecognized option, try again"
