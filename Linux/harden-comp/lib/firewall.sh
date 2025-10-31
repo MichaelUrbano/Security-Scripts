@@ -23,7 +23,9 @@ init_firewall() {
       systemctl enable --now firewalld
       firewall-cmd --reload
     } || {
-      print_status message error "Something went wrong, exiting..."
+      print_status message error \
+        "Something went wrong, attempting to restore backup..."
+      restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
 
@@ -41,7 +43,9 @@ init_firewall() {
       systemctl enable --now ufw
       ufw --force enable
     } || {
-      print_status message error "Something went wrong, exiting..."
+      print_status message error \
+        "Something went wrong, attempting to restore backup..."
+      restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
 
@@ -73,7 +77,9 @@ init_firewall() {
       fi
       systemctl enable --now nftables
     } || {
-      print_status message error "Something went wrong, exiting..."
+      print_status message error \
+        "Something went wrong, attempting to restore backup..."
+      restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
 
@@ -106,7 +112,9 @@ init_firewall() {
       ip6tables-save >/etc/iptables/rules.v6
       systemctl enable --now netfilter-persistent
     } || {
-      print_status message error "Something went wrong, exiting..."
+      print_status message error \
+        "Something went wrong, attempting to restore backup..."
+      restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
   else
@@ -118,24 +126,26 @@ init_firewall() {
 # User interactive function
 configure_firewall() {
   if [ ${#FIREWALLS[@]} -eq 0 ]; then
-    echo "Please install a firewall onto the system, then try again."
+    print_status message error "Ensure a firewall is installed on the system"
     return 1
   fi
 
   fw_help() {
     clear
-    echo -e "Command options are as follows:"
+    printf "Commands:\n"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s|show" "Will ask if you would like to finalize your configuration"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s|show" "Will show your rulelist"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a rule"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will show your currently configured rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will reset your rules"
-    echo -e "Long or short names for commands may be used."
-    echo -e "You can set the allow rules you would like on the system with the ${YELLOW}a${NC} command"
-    echo -e "No changes will be made to the actual firewall configuration until you enter the ${YELLOW}f${NC} command"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will reset all of your rules"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will implement your rules onto the actual firewall"
+    printf "Long or short names for commands may be used.\n"
+    printf "Before rules are applied to your actual firewall, they are added\n"
+    printf "to your rulelist which can be viewed with s. Once the rulelist\n"
+    printf "looks all good, the f command is used to take the rulelist, and\n"
+    printf "apply them to the permanent firewall configuration on the system\n"
     echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
     echo -e "${YELLOW}You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule${NC}"
     echo -e "Example:"
@@ -150,27 +160,33 @@ configure_firewall() {
     while true; do
       read -rp "Enter port/protocol or service name (q to exit): " service protocol
       # For verifying that given input is valid
-      if [[ "$service" =~ ^[0-9]+$ ]]; then           # Is input only numbers?
-        if ((service >= 1 && service <= 65535)); then # Is input a valid port number?
-          if [[ "$protocol" =~ ^(tcp|udp)$ ]]; then   # Did they specify a valid protocol?
+      # Is input only numbers, then is it a valid port number, and finally
+      # did they specify a valid protocol?
+      if [[ "$service" =~ ^[0-9]+$ ]]; then
+        if ((service >= 1 && service <= 65535)); then
+          if [[ "$protocol" =~ ^(tcp|udp)$ ]]; then
             valid_port="true"
             append="${service}/${protocol}"
           fi
         fi
-      elif [[ "$service" =~ ^[a-z\-]+[a-z0-9]$ ]]; then # Is input letters/dashes, ending with a letter or 1 digit? (ex: "pop3" and "ssh" will match, but not "prot42")
+      # NaN? Lets check if they give a service name instead
+      # Is input letters/dashes, ending with a letter or 1 digit?
+      # Example: "pop3" and "ssh" will match, but not "prot42")
+      elif [[ "$service" =~ ^[a-z-]+[a-z0-9]$ ]]; then
         local service_name=""
         local attempted_service=""
-        for service_name in "${service_ports[@]}"; do # Does the input service exist in the array?
+        # Does the input service exist in the service_ports array?
+        for service_name in "${service_ports[@]}"; do
           attempted_service=$(echo "$service_name" | cut -d ":" -f 1)
           if [[ "$attempted_service" = "$service" ]]; then
             valid_name="true"
             append=$(echo "$service_name" | cut -d ":" -f 2)
           fi
         done
-      elif [[ "$service" = "q" ]]; then # did they type q talso_doo exit?
+      elif [[ "$service" = "q" ]]; then # did they type q to exit?
         return 0
       else
-        echo -e "${RED}Invalid input${NC}"
+        print_status invalid_input error "$service"
         service=""
         protocol=""
         valid_port="false"
@@ -179,8 +195,9 @@ configure_firewall() {
         continue
       fi
 
+      # Is the rule already in the rulelist?
       for rule in "${rulelist[@]}"; do
-        if [[ "$rule" = "$append" ]]; then
+        if [[ "$rule" == "$append" ]]; then
           echo -e "${RED}Rule already exists.${NC}"
           service=""
           protocol=""
@@ -287,6 +304,7 @@ configure_firewall() {
     local port
     local protocol
     echo -e "${RED}Applying rules to ${active_firewall}${NC}"
+
     # There is no default drop policy for output packets on firewalld,
     # therefore rich rules have to be used
     if [[ "$active_firewall" = "firewalld" ]]; then
@@ -319,7 +337,9 @@ configure_firewall() {
         done
         firewall-cmd --set-default-zone=hardened
       } || {
-        printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+        print_status message error \
+          "Something went wrong, attempting to restore backup..."
+        restore_firewall || print_status message error "Backup restoration failed"
         return 1
       }
 
@@ -380,7 +400,9 @@ configure_firewall() {
             | tee /etc/nftables.conf /etc/sysconfig/nftables.conf > /dev/null
         fi
       } || {
-        printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+        print_status message error \
+          "Something went wrong, attempting to restore backup..."
+        restore_firewall || print_status message error "Backup restoration failed"
         return 1
       }
 
@@ -407,11 +429,14 @@ configure_firewall() {
         iptables-save >/etc/iptables/rules.v4
         ip6tables-save >/etc/iptables/rules.v6
       } || {
-        printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+        print_status message error \
+          "Something went wrong, attempting to restore backup..."
+        restore_firewall || print_status message error "Backup restoration failed"
         return 1
       }
     else
-      printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+      print_status message error \
+        "Something went wrong, exiting..."
       exit 1
     fi
   }
@@ -437,11 +462,13 @@ configure_firewall() {
     ssh:22/tcp
     smtp:25/tcp
     dns:53/udp # tcp also valid
+    dns-tcp:53/tcp
     dhcp:67/udp
     dhcp-client:68/udp
     tftp:69/udp
     http:80/tcp
-    kerberos:88/tcp # udp also valid
+    kerberos:88/udp # udp also valid
+    kerberos-tcp:88/tcp
     pop3:110/tcp
     ntp:123/udp
     netbios-ns:137/udp
@@ -450,20 +477,22 @@ configure_firewall() {
     imap:143/tcp
     snmp:161/udp
     snmp-trap:162/udp
-    ldap:389/tcp  # udp also valid
+    ldap:389/tcp  # udp also valid?
     https:443/tcp # udp also valid
+    https-udp:443/tcp
     samba:445/tcp
     smpts:465/tcp
     syslog:514/udp
     dhcpv6-client:546/udp
     dhcpv6:547/udp
-    ldaps:636/tcp # udp also valid
+    ldaps:636/tcp # udp also valid?
     ftps-data:989/tcp
     ftps:990/tcp
     imaps:993/tcp
     pops:995/tcp
     mysql:3306/tcp
     rdp:3389/tcp # udp also valid
+    rdp-udp:3389/tcp
     vnc:5900/tcp
   )
 
@@ -668,7 +697,7 @@ restore_firewall() {
   local path
   for path in "${!FW_BACKUPS[@]}"; do
     cp "$path" "${FW_BACKUPS["$path"]}" || {
-      print_status message error "Failed to restore ${path}"
+      print_status message_object error file "Failed to restore" "$path"
       return 1
     }
   done

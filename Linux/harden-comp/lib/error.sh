@@ -8,7 +8,7 @@
 # print_status already_exists status
 # print_status using_to status
 # print_status not_installed status
-# print_status invalud_input status
+# print_status invalid_input status "text"
 # print_status unrecognized_option status
 # print_status found_in status
 # print_status duplicate_found_in status

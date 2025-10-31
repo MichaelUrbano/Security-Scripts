@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck source=/dev/null
 
 # Want to get close to Google's styleguide?
 # Run shfmt -i 2 -ci -bn
@@ -240,24 +241,24 @@ check_root
 
 override() {
   if [[ -n "$ARG_DISTRO" ]]; then
-    print_status message_object alert option \
-      "Overriding distribution ID:" "$ARG_DISTRO"
     DISTRO="$ARG_DISTRO"
+    print_status message_object alert option \
+      "Overriding distribution ID:" "$DISTRO"
   fi
   if [[ -n "$ARG_VER" ]]; then
-    print_status message_object alert option \
-      "Overriding distribution version:" "$ARG_VER"
     VER="$ARG_VER"
+    print_status message_object alert option \
+      "Overriding distribution version:" "$VER"
   fi
   if [[ -n "$ARG_PM" ]]; then
-    print_status message_object alert option \
-      "Overriding package manager:" "$ARG_PM"
     PKG_MANAGER="$ARG_PM"
+    print_status message_object alert option \
+      "Overriding package manager:" "$PKG_MANAGER"
   fi
   if [[ -n "$ARG_FW" ]]; then
-    print_status message_object alert option \
-      "Overriding firewall:" "$ARG_FW"
     FIREWALLS=("$ARG_FW")
+    print_status message_object alert option \
+      "Overriding firewall:" "${FIREWALLS[0]}"
   fi
   if [[ -n "$ARG_DIRECTORY" ]]; then
     print_status message_object info directory \
