@@ -203,8 +203,9 @@ ask_to_remove_packages() {
   echo -e "${BLUE}look carefully at each, and determine if they are necessary or not.${NC}"
   local pkg
   for pkg in "${PACKAGES[@]}"; do
-    remove_package "$PKG_MANAGER" "$pkg"
+    remove_package "$PKG_MANAGER" "$pkg" || true
   done
+  return 0
 }
 
 install_recommended_packages() {
@@ -281,13 +282,13 @@ install_recommended_packages() {
 }
 
 download_software() {
-  if command -v wget; then
+  if command -v wget &> /dev/null; then
     wget -qO ./tools/linpeas.sh \
       "https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh"
     wget -qO ./tools/maldetect-current.tar.gz \
       "https://www.rfxn.com/downloads/maldetect-current.tar.gz"
     print_status message_object success command "Downloaded files with" "wget"
-  elif command -v curl; then
+  elif command -v curl &> /dev/null; then
     curl -sOJ \
       https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh \
       --output-dir ./tools

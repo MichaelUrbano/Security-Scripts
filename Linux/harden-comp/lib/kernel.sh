@@ -12,7 +12,7 @@ disable_kernel_modules() {
 #    "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
 #    "nfs_common" "nfsd" "smbfs_common"
 #  )
-  if "$DISTRO" != "ubuntu" && ! command -v snap; then
+  if "$DISTRO" != "ubuntu" && ! command -v snap &> /dev/null; then
     modules+=("squashfs")
   fi
   local hardening_blacklist="/etc/modprobe.d/hardening-blacklist.conf"
@@ -24,6 +24,7 @@ disable_kernel_modules() {
       echo "install $mod /bin/false" >>"$hardening_blacklist"
     fi
   done
+  print_status message success "Configured kernel modules"
 }
 
 # Configure sysctl parameters to harden the system
@@ -90,6 +91,7 @@ configure_sysctl() {
   fi
   # Disable core dumps
   echo "* hard core 0" > "$limits_file"
+  print_status message success "Reconfigured sysctl parameters"
 }
 
 # Will change boot parameters and ensure MAC is enforced
@@ -137,7 +139,7 @@ configure_grub() {
     return 1
   fi
 
-  print_status message success "Reconfigured GRUB successfully"
+  print_status message success "Reconfigured GRUB"
 }
 
 configure_mac() {
@@ -165,7 +167,6 @@ configure_mac() {
         ps -eZ | grep unconfined_service_t
       fi
       ;;
-
   esac
-  return 1
+  print_status message success "Configured Mandatory Access Controls"
 }

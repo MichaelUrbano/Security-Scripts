@@ -2,7 +2,7 @@
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
-  if ! command -v auditctl; then
+  if ! command -v auditctl &> /dev/null; then
     print_status message error "Please ensure auditd is installed"
     return 1
   fi
@@ -10,7 +10,7 @@ configure_auditd() {
     print_status not_found error file "/etc/audit/auditd.conf"
     return 1
   fi
-  if [[ ! -d /etc/audit/rules.d || -f /etc/audit/rules.d/99-hardening.rules ]]; then
+  if [[ ! -d /etc/audit/rules.d ]]; then
     print_status not_found error directory "/etc/audit/rules.d"
     return 1
   fi
@@ -397,4 +397,5 @@ configure_aide() {
       ;;
   esac
   systemctl enable --now dailyaidecheck.timer
+  print_status message success "AIDE configured"
 }

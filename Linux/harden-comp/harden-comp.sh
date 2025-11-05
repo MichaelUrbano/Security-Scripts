@@ -477,12 +477,14 @@ main() {
         logs)
           local option_one="false"
           local option_two="false"
+          local journal_remote="false"
+          local rsyslog="false"
           while true; do
             read -rp "Configure systemd-journal-remote? (y/n): " \
               option_one
             case $option_one in
               y)
-                option_one="true" && break
+                journal_remote="true" && break
                 ;;
               n)
                 break
@@ -493,13 +495,13 @@ main() {
             esac
           done
 
-          if [[ "$option_one" == "false" ]]; then
+          if [[ "$journal_remote" == "false" ]]; then
             while true; do
               read -rp "Configure rsyslog for remote logging instead? (y/n): " \
                 option_two
               case $option_two in
                 y)
-                  option_two="true" && break
+                  rsyslog="true" && break
                   ;;
                 n)
                   break
@@ -510,7 +512,7 @@ main() {
               esac
             done
           fi
-          configure_logging journal_remote="$option_one" rsyslog="$option_two" \
+          configure_logging journal_remote="$journal_remote" rsyslog="$rsyslog" \
             || print_status unsuccessful_function error \
               "configure_logging"
           ;;

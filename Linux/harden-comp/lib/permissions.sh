@@ -99,6 +99,7 @@ configure_partitions() {
   else
     echo "tmpfs /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0" >>/etc/fstab
   fi
+  print_status message success "Configured partitions"
 }
 
 # CIS Ubuntu and RHEL
@@ -306,4 +307,5 @@ configure_permissions() {
       fi
       ;;
   esac
+  print_status message success "Configured permissions"
 }
