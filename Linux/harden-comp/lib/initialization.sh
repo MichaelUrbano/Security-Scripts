@@ -1,12 +1,18 @@
 #!/bin/bash
 
 # just clear
-jclr() { 
+jclr() {
+  if [[ "$ARG_CLEAR" == "disabled" ]]; then
+    return 0
+  fi
   [ -t 1 ] && clear;
 }
 
 # prompt clear
 pclr() {
+  if [[ "$ARG_CLEAR" == "disabled" ]]; then
+    return 0
+  fi
   local no_reply
   read -rp "Press enter to continue: " no_reply
   echo "$no_reply" &> /dev/null
@@ -29,7 +35,7 @@ check_logging() {
   return 1
 }
 
-check_uesrs_and_groups() {
+check_users_and_groups() {
   return 1
 }
 

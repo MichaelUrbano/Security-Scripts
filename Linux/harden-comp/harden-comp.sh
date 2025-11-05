@@ -16,6 +16,7 @@ ARG_DISTRO=""
 ARG_FW=""
 ARG_PM=""
 ARG_VER=""
+ARG_CLEAR="enabled"
 
 # Set to "true" if you want to ignore the main menu,
 # possibly to run functions directly
@@ -70,11 +71,12 @@ Usage: sudo ./harden-comp.sh [OPTIONS]...
 Hardening and utility script for competitions
 
 OPTIONS:
-  -b, --backup DIRECTORY    send backups to/check for backups in DEST/b4
-                              (default /usr/bin)
+  -b, --backup DIRECTORY    send backups to/check for backups in DIRECTORY/b4
+                              default value is /usr/bin
   -B, --backup-subdirectory DIRECTORY
                             change backup subdirectory
-                              (default /b4)
+                              default value is /b4
+  -c, --no-clear            disables screen clearing
   -d, --distro DIST         override distribution
   -e, --no-errfail          will set +e on the script, preventing the script
                               from exiting on any non-zero status (DANGEROUS)
@@ -175,6 +177,10 @@ EOF
         ARG_SUBDIRECTORY="$2"
       fi
       shift 2
+      ;;
+    -c | --no-clear)
+      ARG_CLEAR="disabled"
+      shift
       ;;
     -d | --distro)
       ARG_DISTRO="$2"
@@ -463,7 +469,7 @@ main() {
               "init_firewall"
           ;;
         fwconf | fwc)
-          clear
+          jclr
           configure_firewall \
             || print_status unsuccessful_function error \
               "configure_firewall"
@@ -569,7 +575,7 @@ main() {
           option_one=""
           ;;
         init)
-          clear
+          jclr
           init
           read -rp "Press enter to continue "
           ;;
@@ -577,7 +583,7 @@ main() {
           exit 0
           ;;
         bash)
-          clear
+          jclr
           print_status message info \
             "Placing you into a bash shell... Use ctrl + d/exit to exit"
           bash -l

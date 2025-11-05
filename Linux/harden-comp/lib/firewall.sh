@@ -132,9 +132,9 @@ configure_firewall() {
   fi
   # Check firewall being used on the system
   local active_firewall=""
-  if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+  if [[ " ${FIREWALLS[*]} " =~ " firewalld " && "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
     active_firewall="firewalld"
-  elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
+  elif [[ " ${FIREWALLS[*]} " =~ " ufw " && "$DISTRO" =~ ^(ubuntu|debian)$ ]]; then
     active_firewall="ufw"
   elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
     active_firewall="nftables"
@@ -142,7 +142,7 @@ configure_firewall() {
     active_firewall="iptables"
   else
     print_status message error "Unrecognized firewall"
-    return 0
+    return 1
   fi
 
   local -a rulelist=()
@@ -261,18 +261,6 @@ configure_firewall() {
     return 0
   }
 
-  fw_show_outbound() {
-    for outbound_service in "${!outbound_rulelist[@]}"; do
-      if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
-        printf "%-15s : %b%7s%b\n" \
-          "$outbound_service" "${GREEN}${BOLD}" "ALLOW" "$NC"
-      else
-        printf "%-15s : %b%7s%b\n" \
-          "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
-      fi
-    done
-  }
-
   fw_toggle_outbound() {
     local outbound_service
     local service_name
@@ -303,6 +291,34 @@ configure_firewall() {
     done
   }
 
+  fw_show_inbound() {
+    local rule=""
+    for rule in "${rulelist[@]}"; do
+      printf "%b%s%b " "$YELLOW" "$rule" "$NC"
+    done
+    printf "\n"
+  }
+
+  fw_show_outbound() {
+    for outbound_service in "${!outbound_rulelist[@]}"; do
+      if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+        printf "%-15s : %b%7s%b\n" \
+          "$outbound_service" "${GREEN}${BOLD}" "ALLOW" "$NC"
+      else
+        printf "%-15s : %b%7s%b\n" \
+          "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
+      fi
+    done
+  }
+
+  fw_list_services() {
+    local service=""
+    for service in "${service_ports[@]}"; do
+      printf "%b%s%b " "$YELLOW" "$service" "$NC"
+    done
+    printf "\n"
+  }
+
   fw_finalize_rules() {
     if [[ "${#rulelist[@]}" -le 0 ]]; then
       print_status message error "Rulelist is empty, add rules, then try again"
@@ -328,7 +344,7 @@ configure_firewall() {
       local interface=""
       local interfaces
       mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' \
-        | grep -qvE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
+        | grep -vE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
       echo -e "${YELLOW}Interfaces:"
       for interface in "${interfaces[@]}"; do
         printf "${YELLOW}%s ${NC}" "$interface"
@@ -349,7 +365,7 @@ configure_firewall() {
       esac
     done
 
-    clear
+    jclr
     echo -e "${RED}${BOLD}FINAL WARNING: This will write to your firewall configuration if you continue.${NC}"
     echo -e "${RED}${BOLD}Default policy for input and output will be set to drop after this configuration finishes.${NC}"
     echo -e "Please double check to confirm this information is correct:"
@@ -378,34 +394,37 @@ configure_firewall() {
         *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
       esac
     done
-    clear
     local rule
     local port
     local protocol
-    echo -e "${RED}Applying rules to ${active_firewall}${NC}"
+    local port_prot
+    jclr
+    print_status message_object info firewall \
+      "Applying rules to" "$active_firewall"
 
     # There is no default drop policy for output packets on firewalld,
     # therefore rich rules have to be used
     if [[ "$active_firewall" = "firewalld" ]]; then
       {
+        print_status message info "Backing up configuration..."
+        backup_firewall firewalld finalize
         firewall-cmd --new-zone=hardened --permanent
         firewall-cmd --zone=hardened --set-target=DROP --permanent
         firewall-cmd --zone=hardened --permanent \
           --add-rich-rule='rule family=ipv4 direction="out" drop'
         firewall-cmd --zone=hardened --permanent \
           --add-rich-rule='rule family=ipv6 direction="out" drop'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv4 direction="out" port port="443" protocol="tcp" accept'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv4 direction="out" port port="80" protocol="tcp" accept'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv4 direction="out" port port="53" protocol="udp" accept'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv6 direction="out" port port="443" protocol="tcp" accept'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv6 direction="out" port port="80" protocol="tcp" accept'
-        firewall-cmd --zone=hardened --permanent \
-          --add-rich-rule='rule family=ipv6 direction="out" port port="53" protocol="udp" accept'
+        for outbound_service in "${!outbound_rulelist[@]}"; do
+          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
+          port=$(echo "$port_prot" | cut -d "/" -f 1)
+          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+            firewall-cmd --zone=hardened --permanent \
+              --add-rich-rule="rule family=ipv4 direction='out' port port='$port' protocol='$protocol' accept"
+            firewall-cmd --zone=hardened --permanent \
+              --add-rich-rule="rule family=ipv6 direction='out' port port='$port' protocol='$protocol' accept"
+          fi
+        done
         for rule in "${rulelist[@]}"; do
           port=$(echo "$rule" | cut -d "/" -f 1)
           protocol=$(echo "$rule" | cut -d "/" -f 2)
@@ -424,25 +443,32 @@ configure_firewall() {
 
     elif [[ "$active_firewall" = "ufw" ]]; then
       {
+        print_status message info "Backing up configuration..."
+        backup_firewall ufw finalize
         for rule in "${rulelist[@]}"; do
           port=$(echo "$rule" | cut -d "/" -f 1)
           protocol=$(echo "$rule" | cut -d "/" -f 2)
           ufw allow in "${port}/${protocol}"
         done
-        ufw allow out 443/tcp
-        ufw allow out 80/tcp
-        ufw allow out 53/udp
+        for outbound_service in "${!outbound_rulelist[@]}"; do
+          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
+          if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+            ufw allow out "$port_prot"
+          fi
+        done
         ufw default deny incoming
         ufw default deny outgoing
       } || {
-        printf "${RED}${BOLD}%s${NC}" "Something went wrong, exiting..."
+        print_status message error \
+          "Something went wrong, attempting to restore backup..."
+        restore_firewall || print_status message error "Backup restoration failed"
         return 1
       }
 
     elif [[ "$active_firewall" = "nftables" ]]; then
       if ! nft list table inet filter &>/dev/null; then
         printf "${RED}%s${YELLOW}%s${NC}" \
-          "table inet filter Not Found, please ensure you ran" "fwconf"
+          "table inet filter Not Found, please ensure you ran" "fwinit"
         return 1
       fi
       if ! nft list chain inet filter INPUT &>/dev/null \
@@ -450,18 +476,25 @@ configure_firewall() {
         && ! nft list chain inet filter FORWARD &>/dev/null; then
         printf "${RED}%s${YELLOW}%s${NC}" \
           "Chain for INPUT, OUTPUT, or FORWARD was not found. Please ensure you ran" \
-          "fwconf"
+          "fwinit"
         return 1
       fi
       {
+        print_status message info "Backing up configuration..."
+        backup_firewall nftables finalize
         for rule in "${rulelist[@]}"; do
           port=$(echo "$rule" | cut -d "/" -f 1)
           protocol=$(echo "$rule" | cut -d "/" -f 2)
           nft add rule inet filter INPUT "$protocol" dport "$port" accept
         done
-        nft add rule inet filter OUTPUT tcp dport 443 accept
-        nft add rule inet filter OUTPUT tcp dport 80 accept
-        nft add rule inet filter OUTPUT udp dport 53 accept
+        for outbound_service in "${!outbound_rulelist[@]}"; do
+          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
+          port=$(echo "$port_prot" | cut -d "/" -f 1)
+          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+            nft add rule inet filter OUTPUT "$protocol" dport "$port" accept
+          fi
+        done
         nft chain inet filter INPUT '{ policy drop; }'
         nft chain inet filter OUTPUT '{ policy drop; }'
         if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
@@ -489,18 +522,23 @@ configure_firewall() {
       # You are supposed to flush, then set policy, then rules,
       # all to avoid packet losses, but we are ignoring that luxury
       {
+        print_status message info "Backing up configuration..."
+        backup_firewall iptables finalize
         for rule in "${rulelist[@]}"; do
           port=$(echo "$rule" | cut -d "/" -f 1)
           protocol=$(echo "$rule" | cut -d "/" -f 2)
           iptables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
           ip6tables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
         done
-        iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
-        iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-        iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-        ip6tables -A OUTPUT -p tcp --dport 443 -j ACCEPT
-        ip6tables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-        ip6tables -A OUTPUT -p udp --dport 53 -j ACCEPT
+        for outbound_service in "${!outbound_rulelist[@]}"; do
+          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
+          port=$(echo "$port_prot" | cut -d "/" -f 1)
+          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+            iptables -A OUTPUT -p "$protocol" --dport "$port" -j ACCEPT
+            ip6tables -A OUTPUT -p "$protocol" --dport "$port" -j ACCEPT
+          fi
+        done
         iptables -P INPUT DROP
         iptables -P OUTPUT DROP
         ip6tables -P INPUT DROP
@@ -518,6 +556,7 @@ configure_firewall() {
         "Something went wrong, exiting..."
       exit 1
     fi
+    print_status message success "Firewall configured"
   }
 
   fw_help() {
@@ -576,18 +615,10 @@ configure_firewall() {
         fw_toggle_outbound
         ;;
       list | l)
-        local service=""
-        for service in "${service_ports[@]}"; do
-          printf "%b%s%b " "$YELLOW" "$service" "$NC"
-        done
-        printf "\n"
+        fw_list_services
         ;;
       show | s)
-        local rule=""
-        for rule in "${rulelist[@]}"; do
-          printf "%b%s%b " "$YELLOW" "$rule" "$NC"
-        done
-        printf "\n"
+        fw_show_inbound
         fw_show_outbound
         ;;
       delete | d)
@@ -640,7 +671,7 @@ backup_firewall() {
       else
         print_status not_found warn directory "/etc/firewalld/zones"
       fi
-
+      print_status message success "Backup completed"
       return 0
       ;;
     ufw)
@@ -670,7 +701,7 @@ backup_firewall() {
       else
         print_status not_found warn file "/etc/ufw/user6.rules"
       fi
-
+      print_status message success "Backup completed"
       return 0
       ;;
     nftables)
@@ -696,7 +727,7 @@ backup_firewall() {
       else
         print_status message warn "No files found for firewall backup"
       fi
-
+      print_status message success "Backup completed"
       return 0
       ;;
     iptables)
@@ -726,7 +757,7 @@ backup_firewall() {
       else
         print_status not_found warn file "/etc/iptables/rules.v6"
       fi
-
+      print_status message success "Backup completed"
       return 0
       ;;
     *)
@@ -754,4 +785,5 @@ restore_firewall() {
       return 1
     }
   done
+  print_status message success "Backups restored"
 }
