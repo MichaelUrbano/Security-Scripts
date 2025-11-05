@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="0.0.1"
+SCRIPT_VERSION="0.1.0"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -17,6 +17,9 @@ ARG_FW=""
 ARG_PM=""
 ARG_VER=""
 ARG_CLEAR="enabled"
+ARG_QUICK="disabled"
+ARG_BACKUP="disabled"
+ARG_COMPRESS="enabled"
 
 # Set to "true" if you want to ignore the main menu,
 # possibly to run functions directly
@@ -62,6 +65,37 @@ check_root() {
   fi
 }
 
+override() {
+  if [[ -n "$ARG_DISTRO" ]]; then
+    DISTRO="$ARG_DISTRO"
+    print_status message_object alert option \
+      "Overriding distribution ID:" "$DISTRO"
+  fi
+  if [[ -n "$ARG_VER" ]]; then
+    VER="$ARG_VER"
+    print_status message_object alert option \
+      "Overriding distribution version:" "$VER"
+  fi
+  if [[ -n "$ARG_PM" ]]; then
+    PKG_MANAGER="$ARG_PM"
+    print_status message_object alert option \
+      "Overriding package manager:" "$PKG_MANAGER"
+  fi
+  if [[ -n "$ARG_FW" ]]; then
+    FIREWALLS=("$ARG_FW")
+    print_status message_object alert option \
+      "Overriding firewall:" "${FIREWALLS[0]}"
+  fi
+  if [[ -n "$ARG_DIRECTORY" ]]; then
+    print_status message_object info directory \
+      "Backup directory set:" "$ARG_DIRECTORY"
+  fi
+  if [[ -n "$ARG_SUBDIRECTORY" ]]; then
+    print_status message_object info directory \
+      "Backup subdirectory set:" "$ARG_SUBDIRECTORY"
+  fi
+}
+
 # Check for OPTIONS passed
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -77,7 +111,7 @@ OPTIONS:
                             change backup subdirectory
                               default value is /b4
   -c, --no-clear            disable screen clearing
-  -C, --no-compress         backups will not be compressed (currently nonfunctional)
+  -C, --no-compress         backups will not be compressed
   -d, --distro DIST         override distribution
   -e, --no-errfail          will set +e on the script, preventing the script
                               from exiting on any non-zero status (DANGEROUS)
@@ -85,7 +119,8 @@ OPTIONS:
   -i, --init                show information from init() function, then exit
   -p, --pkg-manager PM      override package manager
   -P, --skip-pkg-chk        skips check_installed_packages() inside of main()
-  -q, --quick               run all options under Quick, then exit
+  -q, --run-quick           run all options under Quick, then exit
+  -r, --run-backup          will run backup function
   -s, --skip-main           skips main() function
   -V, --distro-version VER  override distribution version
   -x, --xtrace              will set -x on the script, for debugging
@@ -136,7 +171,7 @@ Exit status:
  0  if OK,
  1  if any problems occur.
 
-From Security-Scripts, by Michael Urbano.
+Part of Security Scripts, by Michael Urbano.
 For more information, please visit GitHub.
 <https://github.com/MichaelUrbano/Security-Scripts>.
 Report bugs, vulnerabilties, or other issues to git@michaelurbano.com
@@ -210,9 +245,13 @@ EOF
       SKIP_PKG_CHK="true"
       shift
       ;;
-    -q | --quick)
-      :
-      exit 0
+    -q | --run-quick)
+      ARG_QUICK="enabled"
+      shift
+      ;;
+    -r | --run-backup)
+      ARG_BACKUP="enabled"
+      shift
       ;;
     -s | --skip-main)
       SKIP_MAIN="true"
@@ -235,6 +274,37 @@ done
 
 check_root
 
+if [[ "$ARG_BACKUP" == "enabled" ]]; then
+  . ./lib/error.sh
+  . ./lib/utility.sh
+  backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
+  || print_status unsuccessful_function error \
+    "backup_directories"
+  exit 0
+fi
+if [[ "$ARG_QUICK" == "enabled" ]]; then
+  . ./lib/initialization.sh
+  . ./lib/utility.sh
+  . ./lib/error.sh
+  . ./lib/kernel.sh
+  . ./lib/permissions.sh
+  init
+  override
+  configure_permissions \
+    || print_status unsuccessful_function error "configure_permissions"
+  configure_partitions \
+    || print_status unsuccessful_function error "configure_partitions"
+  configure_grub \
+    || print_status unsuccessful_function error "configure_grub"
+  disable_kernel_modules \
+    || print_status unsuccessful_function error "disable_kernel_modules"
+  configure_sysctl \
+    || print_status unsuccessful_function error "configure_sysctl"
+  configure_mac \
+    || print_status unsuccessful_function error "configure_mac"
+  exit 0
+fi
+
 # source scripts from ./lib
 . ./lib/initialization.sh
 . ./lib/utility.sh
@@ -245,37 +315,6 @@ check_root
 . ./lib/packages.sh
 . ./lib/permissions.sh
 . ./lib/not-yet-implemented.sh
-
-override() {
-  if [[ -n "$ARG_DISTRO" ]]; then
-    DISTRO="$ARG_DISTRO"
-    print_status message_object alert option \
-      "Overriding distribution ID:" "$DISTRO"
-  fi
-  if [[ -n "$ARG_VER" ]]; then
-    VER="$ARG_VER"
-    print_status message_object alert option \
-      "Overriding distribution version:" "$VER"
-  fi
-  if [[ -n "$ARG_PM" ]]; then
-    PKG_MANAGER="$ARG_PM"
-    print_status message_object alert option \
-      "Overriding package manager:" "$PKG_MANAGER"
-  fi
-  if [[ -n "$ARG_FW" ]]; then
-    FIREWALLS=("$ARG_FW")
-    print_status message_object alert option \
-      "Overriding firewall:" "${FIREWALLS[0]}"
-  fi
-  if [[ -n "$ARG_DIRECTORY" ]]; then
-    print_status message_object info directory \
-      "Backup directory set:" "$ARG_DIRECTORY"
-  fi
-  if [[ -n "$ARG_SUBDIRECTORY" ]]; then
-    print_status message_object info directory \
-      "Backup subdirectory set:" "$ARG_SUBDIRECTORY"
-  fi
-}
 
 # Print the options available
 print_main_menu() {
@@ -363,7 +402,7 @@ main() {
   while true; do
     print_main_menu
     while true; do
-      read -rp "Enter an option: "
+      read -rp "harden-comp> "
       case $REPLY in
         backup | b)
           backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
@@ -571,6 +610,7 @@ main() {
         init)
           jclr
           init
+          override
           read -rp "Press enter to continue "
           ;;
         exit | quit | q | ex) 
@@ -583,7 +623,7 @@ main() {
           bash -l
           ;;
         *)
-          print_status unrecognized_option error "$REPLY"
+          print_status unrecognized_option error "$REPLY" rude
           REPLY=""
           continue
           ;;

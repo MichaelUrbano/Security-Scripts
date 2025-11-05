@@ -28,18 +28,14 @@
 
 # TODO: (5.4.3.1, 5.4.3.2-3(?))
 
-# TODO: (6.1.1, 6.1.4), (6.1.2-3 (maybe))
+# TODO: (6.1.1, 6.1.4)
 
 # TODO: auditd autoconfig (6.2), including adding .rules files to /etc/audit/rules.d/ (specified in 6.2.3)
 
-# TODO: Supplementary security tools autoconfig (fail2ban, ossec, clamav, chkrootkit, lynis)
-
-# TODO: Get helper functions for implementing colors into printf statements
-# TODO: Create error functions
 # TODO: Use printf instead of echo where appropriate
 # TODO: Implement a logging system
 
-# TODO: automated download linpeas, maldet, and Wazuh deb/rpm
+# TODO: automated download of Wazuh deb/rpm
 
 configure_sudo() {
   return 1

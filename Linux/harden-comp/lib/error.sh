@@ -12,7 +12,7 @@
 # print_status unrecognized_option status
 # print_status found_in status
 # print_status duplicate_found_in status
-# print_status unsuccessful_function status 
+# print_status unsuccessful_function status
 
 
 # Helper function to print status messages
@@ -26,8 +26,8 @@ print_status() {
 # Generic status message
 # print_status message status "text"
 prst_message() {
-  local input_status="$1"
-  local input_text="$2"
+  local input_status="${1:-unknown}"
+  local input_text="${2:-unknown}"
   case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
@@ -44,10 +44,10 @@ prst_message() {
 # Generic status message for text, with an object appended at the end
 # print_status message_object status object "text" "object"
 prst_message_object() {
-  local input_status="$1"
-  local input_object="$2"
-  local input_text="$3"
-  local object_text="$4"
+  local input_status="${1:-unknown}"
+  local input_object="${2:-unknown}"
+  local input_text="${3:-unknown}"
+  local object_text="${4:-unknown}"
   case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
@@ -78,8 +78,10 @@ prst_message_multiobject() {
 # Not found status message
 # print_status not_found status object "path"
 prst_not_found() {
-  local path="$3"
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_object="${2:-unknown}"
+  local input_path="${3:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -87,23 +89,26 @@ prst_not_found() {
     alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
-  case "$2" in
+  case "$input_object" in
     file) local object="file" object_color="${CYAN}${BOLD}" ;;
     directory) local object="directory" object_color="${MAGENTA}${BOLD}" ;;
     command) local object="command" object_color="${YELLOW}${BOLD}" ;;
-    *) local object="$2" object_color="${UC}${BOLD}" ;;
+    *) local object="$input_object" object_color="${UC}${BOLD}" ;;
   esac
   printf "%b[%s]%b %b%s not found:%b %b%s%b\n" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$object" "$NC" \
-    "$object_color" "$path" "$NC"
+    "$object_color" "$input_path" "$NC"
 }
 
 # Already Exists status message
 # print_status already_exists "error|warn" "file|directory|*" "input" "kind|rude"
 prst_already_exists() {
-  local path="$3"
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_object="${2:-unknown}"
+  local input_path="${3:-unknown}"
+  local kindness="${4:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -111,18 +116,18 @@ prst_already_exists() {
     alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
-  case "$2" in
+  case "$input_object" in
     file) local object="file" object_color="${CYAN}${BOLD}" ;;
     directory) local object="directory" object_color="${MAGENTA}${BOLD}" ;;
     command) local object="command" object_color="${YELLOW}${BOLD}" ;;
     rule) local object="rule" object_color="${YELLOW}${BOLD}" ;;
-    *) local object="$2" object_color="${UC}${BOLD}" ;;
+    *) local object="$input_object" object_color="${UC}${BOLD}" ;;
   esac
   printf "%b[%s]%b %b%s already exists:%b %b%s%b%b" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$object" "$NC" \
-    "$object_color" "$path" "$NC" "$text_color"
-  case "$4" in
+    "$object_color" "$input_path" "$NC" "$text_color"
+  case "$kindness" in
     kind) printf ", Please remove it if you would like to try again%b\n" \
       "$NC" ;;
     rude | *) printf "%b\n" "$NC" ;;
@@ -132,7 +137,11 @@ prst_already_exists() {
 # using "package-manager" to install "package"
 # print_status using_to status "install|remove" "package-manager" "package"
 prst_using_to() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_action="${2:-unknown}"
+  local input_package_manager="${3:-unknown}"
+  local input_package="${4:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -140,23 +149,25 @@ prst_using_to() {
     alert) local status="ALERT" status_color="$EC" text_color="$EC" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
-  case "$2" in
+  case "$input_action" in
     install) local action="install" ;;
     remove) local action="remove" ;;
-    *) local action="$2" ;;
+    *) local action="$input_action" ;;
   esac
   printf "%b[%s]%b %bUsing%b %b%s%b %bto %s%b %b%s%b\n" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$NC" \
-    "$YELLOW" "$3" "$NC" \
+    "$YELLOW" "$input_package_manager" "$NC" \
     "$text_color" "$action" "$NC" \
-    "$YELLOW" "$4" "$NC"
+    "$YELLOW" "$input_package" "$NC"
 }
 
 # Not installed: package status message
 # print_status not_installed status "package"
 prst_not_installed() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_package="${2:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -166,21 +177,23 @@ prst_not_installed() {
   esac
   printf "%b[%s]%b %b%s%b: %bnot installed%b\n" \
     "$status_color" "$status" "$NC" \
-    "$YELLOW" "$2" "$NC" \
+    "$YELLOW" "$input_package" "$NC" \
     "$text_color" "$NC"
 }
 # Invalid input status message
 # print_status invalid_input "error|info" "input"
 prst_invalid_input() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_action="${2:-unknown}"
+  case "$input_status" in
     error)
-      printf "%b[ERROR]%b %bInvalid input:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "$RED" "$2" "$NC"
+      printf "%b[ERROR]%b %bInvalid input:%b %b%s%b\n" "$EC" "$NC" "$RED" "$NC" "$RED" "$input_action" "$NC"
       ;;
     info)
-      printf "%b[INFO]%b %bInvalid input:%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$NC" "$BLUE" "$2" "$NC"
+      printf "%b[INFO]%b %bInvalid input:%b %b%s%b\n" "$IC" "$NC" "$BLUE" "$NC" "$BLUE" "$input_action" "$NC"
       ;;
     *)
-      printf "Invalid input: %s\n" "$2"
+      printf "Invalid input: %s\n" "$input_action"
       ;;
   esac
 }
@@ -188,10 +201,10 @@ prst_invalid_input() {
 # Unrecognized option status message
 # print_status unrecognized_option status "input" rude|kind
 prst_unrecognized_option() {
-  local status="$1"
-  local input="$2"
-  local kindness="$3"
-  case "$status" in
+  local input_status="${1:-unknown}"
+  local input_text="${2:-unknown}"
+  local kindness="${3:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -201,7 +214,7 @@ prst_unrecognized_option() {
   printf "%b[%s]%b %bUnrecognized option:%b %b%s%b" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$NC" \
-    "${YELLOW}${BOLD}" "$input" "$NC"
+    "${YELLOW}${BOLD}" "$input_text" "$NC"
   case "$kindness" in
     kind) printf "%b, please try again.%b\n" "$text_color" "$NC" ;;
     rude | *) printf "%b, try again.%b\n" "$text_color" "$NC" ;;
@@ -211,33 +224,41 @@ prst_unrecognized_option() {
 # object found in file alert message
 # print_status found_in alert "input" "path"
 prst_found_in() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_text="${2:-unknown}"
+  local input_path="${3:-unknown}"
+  case "$input_status" in
     *) local status="ALERT" status_color="$EC" text_color="$EC" ;;
   esac
   printf "%b[%s]%b %b%s%b %bfound in%b %b%s%b\n" \
     "$status_color" "$status" "$NC" \
-    "${YELLOW}${BOLD}" "$2" "$NC" \
+    "${YELLOW}${BOLD}" "$input_text" "$NC" \
     "$text_color" "$NC" \
-    "$CYAN" "$3" "$NC"
+    "$CYAN" "$input_path" "$NC"
 }
 
 # Duplicate object found in file alert message
 # print_status duplicate_found_in alert "input" "path"
 prst_duplicate_found_in() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_text="${2:-unknown}"
+  local input_path="${3:-unknown}"
+  case "$input_status" in
     *) local status="ALERT" status_color="$EC" text_color="$EC" ;;
   esac
   printf "%b[%s]%b %bDuplicate%b %b%s%b %bfound in%b %b%s%b\n" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$NC" \
-    "${YELLOW}${BOLD}" "$2" "$NC" \
+    "${YELLOW}${BOLD}" "$input_text" "$NC" \
     "$text_color" "$NC" \
-    "$CYAN" "$3" "$NC"
+    "$CYAN" "$input_path" "$NC"
 }
 
 # print_status unsuccessful_function "error|warn" "function"
 prst_unsuccessful_function() {
-  case "$1" in
+  local input_status="${1:-unknown}"
+  local input_text="${2:-unknown}"
+  case "$input_status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
@@ -247,7 +268,7 @@ prst_unsuccessful_function() {
   esac
   printf "%b[%s]%b %b%s%b %bdid not complete successfully%b\n" \
     "$status_color" "$status" "$NC" \
-    "${YELLOW}${BOLD}" "$2" "$NC" \
+    "${YELLOW}${BOLD}" "$input_text" "$NC" \
     "$text_color" "$NC"
 }
 

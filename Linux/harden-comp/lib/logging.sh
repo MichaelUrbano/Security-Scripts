@@ -15,7 +15,7 @@ configure_auditd() {
     return 1
   fi
   if [[ -f /etc/audit/rules.d/99-hardening.rules ]]; then
-    print_status already_exists error file "99-hardening.rules"
+    print_status already_exists error file "99-hardening.rules" rude
     return 1
   fi
 
@@ -252,7 +252,7 @@ EOF
 
 # CIS Ubuntu 6.1.1-2, RHEL 6.2.1-2
 configure_logging() {
-  if ! command -v journalctl; then
+  if ! command -v journalctl &> /dev/null; then
     print_status message error "Please ensure systemd-journald is installed"
     return 1
   fi

@@ -27,6 +27,7 @@ backup_directories() {
   local flag
   local backup_name
   local directory
+  local extension
   local -Ar directories=(
     ["/etc"]="/ettc-"
     ["/var/www/html"]="/httml-"
@@ -38,9 +39,15 @@ backup_directories() {
       print_status message_object info directory \
         "Performing backup on" "$directory"
       backup_name="${backup_path}${directories[$directory]}$(date +%b-%d-%H.%M.%S)"
-      tar -czf "${backup_name}" "${directory}.tar.gz" &> /dev/null || true
+      if [[ "$ARG_COMPRESS" == "disabled" ]]; then
+        tar -cf "${backup_name}.tar" "${directory}" &> /dev/null || true
+        extension=".tar"
+      else
+        tar -czf "${backup_name}.tgz" "${directory}" &> /dev/null || true
+        extension=".tgz"
+      fi
       for flag in u a i; do
-        chattr +"$flag" "$backup_name" &> /dev/null || true
+        chattr +"$flag" "${backup_name}${extension}" &> /dev/null || true
       done
     fi
   done

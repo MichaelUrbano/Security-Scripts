@@ -257,8 +257,42 @@ configure_firewall() {
   }
 
   fw_delete_rules() {
-    echo "Not yet implemented."
-    return 0
+    local service="" protocol="" port_prot="" valid_input="false" rule=""
+    local -a temp_rulelist=()
+    while true; do
+      if [[ "${#rulelist[@]}" -le 0 ]]; then
+        print_status message info "Rulelist is empty"
+        return 0
+      fi
+      fw_show_inbound
+      read -rp "Enter port & protocol to delete (q to exit): " service protocol
+      if [[ "$service" = "q" ]]; then
+        return 0
+      fi
+      # For verifying that given input is valid
+      # Is input only numbers, then is it a valid port number, and finally
+      # did they specify a valid protocol?
+      if [[ "$service" =~ ^[0-9]+$ ]]; then
+        if ((service >= 1 && service <= 65535)); then
+          if [[ "$protocol" =~ ^(tcp|udp)$ ]]; then
+            valid_input="true"
+            port_prot="${service}/${protocol}"
+          fi
+        fi
+      fi
+      if [[ "$valid_input" == "true" ]]; then
+        for rule in "${rulelist[@]}"; do
+          [[ "$rule" == "$port_prot" ]] || temp_rulelist+=("$rule")
+        done
+        rulelist=("${temp_rulelist[@]}")
+        temp_rulelist=()
+        service="" protocol="" port_prot="" valid_input="false" rule=""
+        continue
+      fi
+      print_status invalid_input error "try again"
+      temp_rulelist=()
+      service="" protocol="" port_prot="" valid_input="false" rule=""
+    done
   }
 
   fw_toggle_outbound() {
@@ -577,7 +611,6 @@ configure_firewall() {
   }
 
   fw_help() {
-    jclr
     printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "a | append" "Allows you to append allow inbound rules to rulelist"
     printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "t | toggle" "Allows you to toggle allow outbound rules on rulelist"
     printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "d | delete" "Will let you delete a specific inbound rule on rulelist"
@@ -603,6 +636,7 @@ configure_firewall() {
   }
 
   # Command prompt loop
+  jclr
   if [[ ! -e .fwinit_ran ]]; then
     print_status message_object alert command "Please ensure you ran" "fwinit"
     printf \
@@ -635,7 +669,9 @@ configure_firewall() {
         fw_list_services
         ;;
       show | s)
+        printf "Inbound Allow Rules:\n"
         fw_show_inbound
+        printf "Outbound Rules:\n"
         fw_show_outbound
         ;;
       delete | d)

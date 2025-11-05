@@ -12,7 +12,7 @@ disable_kernel_modules() {
 #    "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
 #    "nfs_common" "nfsd" "smbfs_common"
 #  )
-  if "$DISTRO" != "ubuntu" && ! command -v snap &> /dev/null; then
+  if [[ "$DISTRO" != "ubuntu" ]] && ! command -v snap &> /dev/null; then
     modules+=("squashfs")
   fi
   local hardening_blacklist="/etc/modprobe.d/hardening-blacklist.conf"
@@ -145,13 +145,13 @@ configure_grub() {
 configure_mac() {
   case "$DISTRO" in
     ubuntu | debian | opensuse*)
-      if ! command -v aa-enforce; then
+      if ! command -v aa-enforce &> /dev/null; then
         print_status message_object error command \
           "Could not run" "aa-enforce"
         return 1
       fi
       aa-enforce /etc/apparmor.d/* &>/dev/null || true
-      aa-complain /usr/share/apparmor/extra-profiles/* || true
+      aa-complain /usr/share/apparmor/extra-profiles/* &>/dev/null || true
       ;;
     centos | rocky | almalinux | fedora | rhel | ol)
       if ! grep -qE '^[[:blank:]]*SELINUXTYPE=(targeted|mls)\b' /etc/selinux/config; then
