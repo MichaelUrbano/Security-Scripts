@@ -400,7 +400,7 @@ main() {
                 remote_logging="rsyslog" && break
                 ;;
               *)
-                print_status message unrecognized_option error "$option_one"
+                print_status unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -417,7 +417,7 @@ main() {
                   option_one="false" && break
                   ;;
                 *)
-                  print_status message unrecognized_option error "$option_one"
+                  print_status unrecognized_option error "$option_one"
                   ;;
               esac
             done
@@ -434,7 +434,7 @@ main() {
                 option_two="false" && break
                 ;;
               *)
-                print_status message unrecognized_option error "$option_two"
+                print_status unrecognized_option error "$option_two"
                 ;;
             esac
           done
@@ -457,12 +457,12 @@ main() {
             || print_status unsuccessful_function error \
               "configure_mac"
           ;;
-        fwinit)
+        fwinit | fwi)
           init_firewall \
             || print_status unsuccessful_function error \
               "init_firewall"
           ;;
-        fwconf)
+        fwconf | fwc)
           clear
           configure_firewall \
             || print_status unsuccessful_function error \
@@ -482,7 +482,7 @@ main() {
                 break
                 ;;
               *)
-                print_status message unrecognized_option error "$option_one"
+                print_status unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -499,7 +499,7 @@ main() {
                   break
                   ;;
                 *)
-                  print_status message unrecognized_option error "$option_two"
+                  print_status unrecognized_option error "$option_two"
                   ;;
               esac
             done
@@ -508,7 +508,7 @@ main() {
             || print_status unsuccessful_function error \
               "configure_logging"
           ;;
-        audit)
+        audit | au)
           configure_auditd \
             || print_status unsuccessful_function error \
               "configure_auditd"
@@ -543,7 +543,7 @@ main() {
             || print_status unsuccessful_function error \
               "configure_partitions"
           ;;
-        modules)
+        modules | mods)
           disable_kernel_modules \
             || print_status unsuccessful_function error \
               "disable_kernel_modules"
@@ -560,7 +560,7 @@ main() {
                 option_one="false" && break
                 ;;
               *)
-                print_status message unrecognized_option error "$option_one"
+                print_status unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -583,12 +583,11 @@ main() {
           bash -l
           ;;
         *)
-          print_status message unrecognized_option error "$REPLY"
+          print_status unrecognized_option error "$REPLY"
           REPLY=""
           continue
           ;;
       esac
-
       REPLY=""
       break
     done

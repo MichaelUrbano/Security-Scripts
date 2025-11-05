@@ -1,11 +1,16 @@
 #!/bin/bash
 
-jclr() {
-  clear
+# just clear
+jclr() { 
+  [ -t 1 ] && clear;
 }
 
+# prompt clear
 pclr() {
-  clear
+  local no_reply
+  read -rp "Press enter to continue: " no_reply
+  echo "$no_reply" &> /dev/null
+  [ -t 1 ] && clear;
 }
 
 check_cron() {

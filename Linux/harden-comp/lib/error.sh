@@ -200,7 +200,7 @@ prst_unrecognized_option() {
   printf "%b[%s]%b %bUnrecognized option:%b %b%s%b" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$NC" \
-    "$text_color" "$input" "$NC"
+    "${YELLOW}${BOLD}" "$input" "$NC"
   case "$kindness" in
     kind) printf "%b, please try again.%b\n" "$text_color" "$NC" ;;
     rude | *) printf "%b, try again.%b\n" "$text_color" "$NC" ;;

@@ -121,6 +121,7 @@ init_firewall() {
     print_status message error "Unrecognized firewall"
     return 1
   fi
+  touch .fwinit_ran
 }
 
 # User interactive function
@@ -129,32 +130,68 @@ configure_firewall() {
     print_status message error "Ensure a firewall is installed on the system"
     return 1
   fi
+  # Check firewall being used on the system
+  local active_firewall=""
+  if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+    active_firewall="firewalld"
+  elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
+    active_firewall="ufw"
+  elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
+    active_firewall="nftables"
+  elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
+    active_firewall="iptables"
+  else
+    print_status message error "Unrecognized firewall"
+    return 0
+  fi
 
-  fw_help() {
-    jclr
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow inbound rules to rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "t|toggle" "Allows you to toggle allow outbound rules on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a specific inbound rule on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will delete all of your rules on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s|show" "Will show your rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will implement your rulelist onto the permanent firewall configuration"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
-    printf "\n"
-    printf "Before rules are applied to the real firewall configuration,\n"
-    printf \
-      "they are added to your %brulelist%b, which can be viewed with %bs%b.\n" \
-      "${YELLOW}${BOLD}" "$NC" \
-      "${YELLOW}${BOLD}" "$NC"
-    printf "%bf%b applies the rulelist to the real, " \
-      "${YELLOW}${BOLD}" "$NC"
-    printf "permanent firewall configuration.\n"
-    printf "Acceptable Syntax Examples:\n"
-    printf "Enter port/protocol or service name: 22 tcp\n"
-    printf "Enter port/protocol or service name: ssh\n"
-    echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
-  }
+  local -a rulelist=()
+  local -A outbound_rulelist=(
+    ["http:80/tcp"]="ALLOW"
+    ["https:443/tcp"]="ALLOW"
+    ["dns:53/udp"]="ALLOW"
+    ["ntp:123/udp"]="ALLOW"
+    ["dns-xfr:53/tcp"]="DROP"
+  )
+  local -ar service_ports=(
+    ftp-data:20/tcp
+    ftp:21/tcp
+    ssh:22/tcp
+    smtp:25/tcp
+    dns:53/udp
+    dns-xfr:53/tcp
+    dhcp:67/udp
+    dhcp-client:68/udp
+    tftp:69/udp
+    http:80/tcp
+    kerberos:88/udp
+    kerberos-tcp:88/tcp
+    pop3:110/tcp
+    ntp:123/udp
+    netbios-ns:137/udp
+    netbios-dgm:138/udp
+    netbios-ssn:139/tcp
+    imap:143/tcp
+    snmp:161/udp
+    snmp-trap:162/udp
+    ldap:389/tcp
+    https:443/tcp
+    https3:443/udp
+    samba:445/tcp
+    smpts:465/tcp
+    syslog:514/udp
+    dhcpv6-client:546/udp
+    dhcpv6:547/udp
+    ldaps:636/tcp
+    ftps-data:989/tcp
+    ftps:990/tcp
+    imaps:993/tcp
+    pops:995/tcp
+    mysql:3306/tcp
+    rdp:3389/tcp
+    rdp-udp:3389/udp
+    vnc:5900/tcp
+  )
 
   fw_add_rules() {
     local service="" protocol="" valid_port="false" valid_name="false" append="" rule=""
@@ -209,7 +246,6 @@ configure_firewall() {
         fi
       done
 
-      # Could be improved, lots of repeated logic
       if [[ "$valid_port" = "true" || "$valid_name" = "true" ]]; then
         mapfile -t -O "${#rulelist[@]}" rulelist < <(echo "$append")
         echo -e "Added rule ${YELLOW}${append}${NC} to rulelist"
@@ -225,6 +261,48 @@ configure_firewall() {
     return 0
   }
 
+  fw_show_outbound() {
+    for outbound_service in "${!outbound_rulelist[@]}"; do
+      if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
+        printf "%-15s : %b%7s%b\n" \
+          "$outbound_service" "${GREEN}${BOLD}" "ALLOW" "$NC"
+      else
+        printf "%-15s : %b%7s%b\n" \
+          "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
+      fi
+    done
+  }
+
+  fw_toggle_outbound() {
+    local outbound_service
+    local service_name
+    local reply
+    while true; do
+      jclr
+      fw_show_outbound
+      printf "%bq%b to exit\n" "${YELLOW}${BOLD}" "$NC"
+      read -rp "Enter service name to toggle (q to exit): " reply
+      case "$reply" in
+        q)
+          return 0
+          ;;
+        *)
+          # TODO: excessive nesting, needs to be cleaned
+          for outbound_service in "${!outbound_rulelist[@]}"; do
+            service_name=$(echo "$outbound_service" | cut -d ":" -f 1)
+            if [[ "$service_name" == "$reply" ]]; then
+              if [[ "${outbound_rulelist[$outbound_service]}" == "DROP" ]]; then
+                outbound_rulelist[$outbound_service]="ALLOW"
+              else
+                outbound_rulelist[$outbound_service]="DROP"
+              fi
+            fi
+          done
+          ;;
+      esac
+    done
+  }
+
   fw_finalize_rules() {
     if [[ "${#rulelist[@]}" -le 0 ]]; then
       print_status message error "Rulelist is empty, add rules, then try again"
@@ -236,7 +314,7 @@ configure_firewall() {
       return 1
     fi
 
-    clear
+    jclr
     local rule=""
     local reply=""
     echo -e "Please confirm this information is correct:"
@@ -442,109 +520,88 @@ configure_firewall() {
     fi
   }
 
-  # Check firewall being used on the system
-  local active_firewall=""
-  if [[ " ${FIREWALLS[*]} " =~ " firewalld " && $DISTRO =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
-    active_firewall="firewalld"
-  elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
-    active_firewall="ufw"
-  elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
-    active_firewall="nftables"
-  elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
-    active_firewall="iptables"
-  else
-    echo -e "${RED}Unrecognized firewall.${NC}"
-    return 0
+  fw_help() {
+    jclr
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a | append" "Allows you to append allow inbound rules to rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "t | toggle" "Allows you to toggle allow outbound rules on rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d | delete" "Will let you delete a specific inbound rule on rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r | reset" "Will delete all of your rules on rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s | show" "Will show your rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l | list" "Will list available service names"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f | finalize" "Will implement your rulelist onto the permanent firewall configuration"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h | help" "Will show you this prompt again"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q | quit" "Will quit to main menu, without saving any changes"
+    printf "\n"
+    printf "Before rules are applied to the real firewall configuration,\n"
+    printf \
+      "they are added to your %brulelist%b, which can be viewed with %bs%b.\n" \
+      "${YELLOW}${BOLD}" "$NC" \
+      "${YELLOW}${BOLD}" "$NC"
+    printf "%bf%b applies the rulelist to the real, " \
+      "${YELLOW}${BOLD}" "$NC"
+    printf "permanent firewall configuration.\n"
+    printf "\nAcceptable Syntax Examples:\n"
+    printf "Enter port/protocol or service name: 22 tcp\n"
+    printf "Enter port/protocol or service name: ssh\n"
+    printf "\n"
+  }
+
+  # Command prompt loop
+  if [[ ! -e .fwinit_ran ]]; then
+    print_status message_object alert command "Please ensure you ran" "fwinit"
+    printf \
+      "%bOtherwise, continue at your own discretion,\nstrange issues may occur%b\n\n" \
+      "${RED}${BOLD}" "$NC"
   fi
-
-  local -ar service_ports=(
-    ftp-data:20/tcp
-    ftp:21/tcp
-    ssh:22/tcp
-    smtp:25/tcp
-    dns:53/udp # tcp also valid
-    dns-tcp:53/tcp
-    dhcp:67/udp
-    dhcp-client:68/udp
-    tftp:69/udp
-    http:80/tcp
-    kerberos:88/udp # udp also valid
-    kerberos-tcp:88/tcp
-    pop3:110/tcp
-    ntp:123/udp
-    netbios-ns:137/udp
-    netbios-dgm:138/udp
-    netbios-ssn:139/tcp
-    imap:143/tcp
-    snmp:161/udp
-    snmp-trap:162/udp
-    ldap:389/tcp  # udp also valid?
-    https:443/tcp # udp also valid
-    https-udp:443/tcp
-    samba:445/tcp
-    smpts:465/tcp
-    syslog:514/udp
-    dhcpv6-client:546/udp
-    dhcpv6:547/udp
-    ldaps:636/tcp # udp also valid?
-    ftps-data:989/tcp
-    ftps:990/tcp
-    imaps:993/tcp
-    pops:995/tcp
-    mysql:3306/tcp
-    rdp:3389/tcp # udp also valid
-    rdp-udp:3389/tcp
-    vnc:5900/tcp
-  )
-
-  local rulelist=()
   printf "%bWelcome to%b %bfwconf%b\n" \
     "$GREEN" "$NC" \
     "${YELLOW}${BOLD}" "$NC"
   printf "View help with %bh%b\n" "${YELLOW}${BOLD}" "$NC"
-  print_status message alert "Please ensure you ran fwconf before this, otherwise you may encounter firewall issues"
   print_status message_object warn firewall "Configuring" "$active_firewall"
   print_status message_object info command "Wrong firewall? Exit with" "q"
   while true; do
-    read -rp "Enter command (h|q|a|s|l|d|r|f): "
+    read -rp "fwconf> "
     case "$REPLY" in
       help | h)
         fw_help
         ;;
       quit | exit | q | ex)
-        clear
+        jclr
         return 0
         ;;
       append | a)
         fw_add_rules
-        clear
+        ;;
+      toggle | t)
+        fw_toggle_outbound
         ;;
       list | l)
         local service=""
         for service in "${service_ports[@]}"; do
-          echo -ne "${YELLOW}${service}${NC} "
+          printf "%b%s%b " "$YELLOW" "$service" "$NC"
         done
-        echo -e ""
+        printf "\n"
         ;;
       show | s)
         local rule=""
         for rule in "${rulelist[@]}"; do
-          echo -ne "${YELLOW}${rule}${NC} "
+          printf "%b%s%b " "$YELLOW" "$rule" "$NC"
         done
-        echo -e ""
+        printf "\n"
+        fw_show_outbound
         ;;
       delete | d)
         fw_delete_rules
         ;;
       reset | r)
         rulelist=()
-        echo -e "${YELLOW}Reset rulelist${NC}"
+        print_status message success "Rulelist reset"
         ;;
       finalize | f)
         fw_finalize_rules
         ;;
       *)
-        echo -e "${RED}Unrecognized option${NC}"
+        print_status unrecognized_option error "$REPLY" rude
         REPLY=""
         ;;
     esac
