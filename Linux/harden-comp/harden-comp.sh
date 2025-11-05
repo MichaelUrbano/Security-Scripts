@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="0.0.0-not-yet-versioned"
+SCRIPT_VERSION="0.0.1"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -76,7 +76,8 @@ OPTIONS:
   -B, --backup-subdirectory DIRECTORY
                             change backup subdirectory
                               default value is /b4
-  -c, --no-clear            disables screen clearing
+  -c, --no-clear            disable screen clearing
+  -C, --no-compress         backups will not be compressed (currently nonfunctional)
   -d, --distro DIST         override distribution
   -e, --no-errfail          will set +e on the script, preventing the script
                               from exiting on any non-zero status (DANGEROUS)
@@ -337,10 +338,6 @@ print_main_menu() {
     "audit" "Initializes auditd configuration and rules"
   printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
     "aide" "Initializes AIDE (may take awhile)"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-    "clam" "Not Yet Implemented: Initializes and configures ClamAV"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-    "fail" "Not Yet Implemented: Helps you configure fail2ban"
   printf "\n"
 }
 
@@ -530,11 +527,6 @@ main() {
           configure_fail2ban \
             || print_status unsuccessful_function error \
               "configure_fail2ban"
-          ;;
-        clam)
-          configure_clamav \
-            || print_status unsuccessful_function error \
-              "configure_clamav"
           ;;
         grub)
           configure_grub \

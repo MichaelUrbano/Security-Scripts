@@ -41,14 +41,6 @@
 
 # TODO: automated download linpeas, maldet, and Wazuh deb/rpm
 
-configure_fail2ban() {
-  return 1
-}
-
-configure_clamav() {
-  return 1
-}
-
 configure_sudo() {
   return 1
 }
