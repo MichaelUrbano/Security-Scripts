@@ -100,7 +100,7 @@ prst_not_found() {
 }
 
 # Already Exists status message
-# print_status already_exists "error|warn" "file|directory|*" "path" "kind|rude"
+# print_status already_exists "error|warn" "file|directory|*" "input" "kind|rude"
 prst_already_exists() {
   local path="$3"
   case "$1" in
@@ -115,6 +115,7 @@ prst_already_exists() {
     file) local object="file" object_color="${CYAN}${BOLD}" ;;
     directory) local object="directory" object_color="${MAGENTA}${BOLD}" ;;
     command) local object="command" object_color="${YELLOW}${BOLD}" ;;
+    rule) local object="rule" object_color="${YELLOW}${BOLD}" ;;
     *) local object="$2" object_color="${UC}${BOLD}" ;;
   esac
   printf "%b[%s]%b %b%s already exists:%b %b%s%b%b" \

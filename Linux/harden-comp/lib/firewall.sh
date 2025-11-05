@@ -236,7 +236,7 @@ configure_firewall() {
       # Is the rule already in the rulelist?
       for rule in "${rulelist[@]}"; do
         if [[ "$rule" == "$append" ]]; then
-          echo -e "${RED}Rule already exists.${NC}"
+          print_status already_exists error rule "$rule" rude
           service=""
           protocol=""
           valid_port="false"
@@ -248,9 +248,9 @@ configure_firewall() {
 
       if [[ "$valid_port" = "true" || "$valid_name" = "true" ]]; then
         mapfile -t -O "${#rulelist[@]}" rulelist < <(echo "$append")
-        echo -e "Added rule ${YELLOW}${append}${NC} to rulelist"
+        printf "Added rule %b%s%b to rulelist\n" "${YELLOW}" "${append}" "${NC}"
       else
-        echo -e "${RED}Invalid input${NC}"
+        print_status invalid_input error "try again"
       fi
       service="" protocol="" valid_port="false" valid_name="false" append=""
     done
@@ -333,65 +333,82 @@ configure_firewall() {
     jclr
     local rule=""
     local reply=""
-    echo -e "Please confirm this information is correct:"
-    echo -e "${YELLOW}Firewall: ${RED}${active_firewall}${NC}"
-    echo -e "${YELLOW}Inbound Allowed ports:"
-    for rule in "${rulelist[@]}"; do
-      printf "${RED}%s ${NC}" "$rule"
-    done
-    echo -e ""
+    printf "Please confirm this information is correct:\n"
+    printf "%bFirewall:%b %b%s%b\n" \
+      "$YELLOW" "$NC" "$RED" "$active_firewall" "$NC"
+    printf "%bInbound Allowed ports:\n" "$YELLOW"
+    fw_show_inbound
+    printf "%bOutbound Allowed ports:%b\n" "$YELLOW" "$NC"
+    fw_show_outbound
     if [[ "$active_firewall" = "firewalld" ]]; then
       local interface=""
       local interfaces
       mapfile -t interfaces < <(ip -o link show | awk -F': ' '{print $2}' \
         | grep -vE '^(lo|docker.*|br-.*|podman.*|tun.*|tap.*|wg.*|veth.*|tailscale.*)$')
-      echo -e "${YELLOW}Interfaces:"
+      printf "%bInterfaces:\n" "$YELLOW"
       for interface in "${interfaces[@]}"; do
         printf "${YELLOW}%s ${NC}" "$interface"
       done
+      printf "\n"
       interface=""
-      echo -e ""
     fi
-    echo -e "${RED}Is this information correct? (y/n)?${NC}"
+    printf "%bIs this information correct?%b" "$RED" "$NC"
     while true; do
       read -rp "(y/n): " reply
       case $reply in
-        y) reply="" && break ;;
+        y) 
+          reply=""
+          break
+          ;;
         n)
-          echo -e "${RED}Bringing you back to the menu...${NC}"
+          jclr
           return 0
           ;;
-        *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
+        *)
+          print_status unrecognized_option error "$reply" kind
+          reply=""
+          ;;
       esac
     done
 
     jclr
-    echo -e "${RED}${BOLD}FINAL WARNING: This will write to your firewall configuration if you continue.${NC}"
-    echo -e "${RED}${BOLD}Default policy for input and output will be set to drop after this configuration finishes.${NC}"
-    echo -e "Please double check to confirm this information is correct:"
-    echo -e "${YELLOW}Firewall: ${RED}${active_firewall}${NC}"
-    echo -e "${YELLOW}Inbound Allowed ports:"
-    for rule in "${rulelist[@]}"; do
-      printf "${RED}%s ${NC}" "$rule"
-    done
-    echo -e ""
+    printf "%b[FINAL WARNING]%b\n" "${RED}${BOLD}" "$NC"
+    printf \
+      "%bThis will overwrite your real, permanent firewall configuration%b\n" \
+      "${RED}${BOLD}" "$NC"
+    printf \
+      "%bDefault policy will become drop for input and output%b\n" \
+      "${RED}${BOLD}" "$NC"
+    printf "Please double check to confirm this information is correct:\n"
+    printf "%bFirewall:%b %b%s%b\n" \
+      "$YELLOW" "$NC" "$RED" "$active_firewall" "$NC"
+    printf "%bInbound Allowed ports:\n" "$YELLOW"
+    fw_show_inbound
+    printf "%bOutbound Allowed ports:%b\n" "$YELLOW" "$NC"
+    fw_show_outbound
     if [[ "$active_firewall" = "firewalld" ]]; then
-      echo -e "${YELLOW}Interfaces:"
+      printf "%bInterfaces:\n" "$YELLOW"
       for interface in "${interfaces[@]}"; do
         printf "${YELLOW}%s ${NC}" "$interface"
       done
+    printf "\n"
     fi
-    echo -e ""
-    echo -e "${RED}Once more: Is this information correct? (y/n)?"
+    printf "%bOnce more: is this information correct?\n%b" "${RED}${BOLD}" "$NC"
     while true; do
       read -rp "(y/n): " reply
       case $reply in
-        y) reply="" && break ;;
+        y)
+          reply=""
+          break
+          ;;
         n)
-          echo -e "${RED}Bringing you back to the menu...${NC}"
+          jclr
           return 0
           ;;
-        *) echo -e "${RED}Unrecognized option, try again${NC}" && reply="" ;;
+        *) 
+          print_status unrecognized_option error "$reply" kind
+          reply=""
+          ;;
       esac
     done
     local rule
