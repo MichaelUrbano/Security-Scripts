@@ -61,6 +61,7 @@ prst_message_object() {
     directory) local object="$object_text" object_color="$MAGENTA" ;;
     command | function) local object="$object_text" object_color="${YELLOW}${BOLD}" ;;
     option) local object="$object_text" object_color="$YELLOW" ;;
+    firewall) local object="$object_text" object_color="${RED}${BOLD}" ;;
     *) local object="$object_text" object_color="$UC" ;;
   esac
   printf "%b[%s]%b %b%s%b %b%s%b\n" \

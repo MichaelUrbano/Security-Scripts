@@ -1,11 +1,11 @@
 #!/bin/bash
 
 jclr() {
-  return 1
+  clear
 }
 
 pclr() {
-  return 1
+  clear
 }
 
 check_cron() {

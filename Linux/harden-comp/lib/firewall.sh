@@ -131,28 +131,29 @@ configure_firewall() {
   fi
 
   fw_help() {
-    clear
-    printf "Commands:\n"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow rules"
+    jclr
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a|append" "Allows you to append allow inbound rules to rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "t|toggle" "Allows you to toggle allow outbound rules on rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a specific inbound rule on rulelist"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will delete all of your rules on rulelist"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s|show" "Will show your rulelist"
     printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l|list" "Will list available service names"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d|delete" "Will let you delete a rule"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r|reset" "Will reset all of your rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will implement your rules onto the actual firewall"
-    printf "Long or short names for commands may be used.\n"
-    printf "Before rules are applied to your actual firewall, they are added\n"
-    printf "to your rulelist which can be viewed with s. Once the rulelist\n"
-    printf "looks all good, the f command is used to take the rulelist, and\n"
-    printf "apply them to the permanent firewall configuration on the system\n"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f|finalize" "Will implement your rulelist onto the permanent firewall configuration"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h|help" "Will show you this prompt again"
+    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q|quit" "Will quit to main menu, without saving any changes"
+    printf "\n"
+    printf "Before rules are applied to the real firewall configuration,\n"
+    printf \
+      "they are added to your %brulelist%b, which can be viewed with %bs%b.\n" \
+      "${YELLOW}${BOLD}" "$NC" \
+      "${YELLOW}${BOLD}" "$NC"
+    printf "%bf%b applies the rulelist to the real, " \
+      "${YELLOW}${BOLD}" "$NC"
+    printf "permanent firewall configuration.\n"
+    printf "Acceptable Syntax Examples:\n"
+    printf "Enter port/protocol or service name: 22 tcp\n"
+    printf "Enter port/protocol or service name: ssh\n"
     echo -e "Please ensure you ran ${YELLOW}fwconf${NC} before this, otherwise you may encounter firewall issues"
-    echo -e "${YELLOW}You may either enter the port number followed by the protocol (tcp | udp) in order to add an allow rule${NC}"
-    echo -e "Example:"
-    echo -e "Enter port/protocol or service name: 22 tcp"
-    echo -e "${YELLOW}Alternatively, you may enter one of the generic names for a protocol below${NC}"
-    echo -e "Example:"
-    echo -e "Enter port/protocol or service name: ssh"
   }
 
   fw_add_rules() {
@@ -497,18 +498,13 @@ configure_firewall() {
   )
 
   local rulelist=()
-  fw_help
-  printf "%bConfiguring%b %b%s%b%b...%b\n" \
+  printf "%bWelcome to%b %bfwconf%b\n" \
     "$GREEN" "$NC" \
-    "$RED" "$active_firewall" "$NC" \
-    "$GREEN" "$NC"
-  printf \
-    "%bIf%b %b%s%b %bis not the correct firewall, enter%b %bq%b %bbelow to cancel the configuration process%b\n" \
-    "$GREEN" "$NC" \
-    "$RED" "$active_firewall" "$NC" \
-    "$GREEN" "$NC" \
-    "${YELLOW}${BOLD}" "$NC" \
-    "$GREEN" "$NC"
+    "${YELLOW}${BOLD}" "$NC"
+  printf "View help with %bh%b\n" "${YELLOW}${BOLD}" "$NC"
+  print_status message alert "Please ensure you ran fwconf before this, otherwise you may encounter firewall issues"
+  print_status message_object warn firewall "Configuring" "$active_firewall"
+  print_status message_object info command "Wrong firewall? Exit with" "q"
   while true; do
     read -rp "Enter command (h|q|a|s|l|d|r|f): "
     case "$REPLY" in
