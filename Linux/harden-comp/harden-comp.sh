@@ -230,7 +230,7 @@ check_root
 
 # source scripts from ./lib
 . ./lib/initialization.sh
-. ./lib/backup.sh
+. ./lib/utility.sh
 . ./lib/error.sh
 . ./lib/firewall.sh
 . ./lib/kernel.sh
@@ -270,6 +270,73 @@ override() {
   fi
 }
 
+# Print the options available
+print_main_menu() {
+  printf "${GREEN}${BOLD}%s${NC}\n" \
+    "Welcome to Michael's Linux Hardening Script (Competition Edition)"
+  printf "${GREEN}%s${NC}\n" \
+    "Options are organized into the sections Tools, Packages, Quick, and Heavy"
+  printf "${GREEN}%s${NC}\n" \
+    "Enter the name of an option below:"
+
+  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+    "Tools" "Useful for operation of the script"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "backup" "Will back up \"important directories\""
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "init" "Show inital information gathered at beginning of the script"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+    "pms" "Not Yet Implemented: Poor Man's SIEM"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "bash" "Enter a bash login shell within the script"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "exit" "Exit program"
+
+  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+    "Packages" "Automated upgrades, removals, and installations"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "upgrade" "Upgrades the system"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "remove" "Asks to remove potentially unwanted packages"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "install" "Asks to install potentially helpful packages"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "download" "Asks to download potentially helpful software"
+
+  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+    "Quick" "Run instantly + don't require package installs (usually)"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "grub" "Configures bootloader parameters"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "perms" \
+    "Reconfigures permissions for files and directories"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "parts" "Sets secure mount options for partitions"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "modules" "Disables unused kernel modules"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "sysctl" "Reconfigures kernel parameters"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "mac" "Sets up AppArmor/SELinux"
+
+  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
+    "Heavy" "May require package installs"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "fwinit" "Initializes the firewall on the system"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "fwconf" "Helps you configure in/out firewall rules"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "logs" "Initializes and configures journald or rsyslog"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "audit" "Initializes auditd configuration and rules"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
+    "aide" "Initializes AIDE (may take awhile)"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+    "clam" "Not Yet Implemented: Initializes and configures ClamAV"
+  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
+    "fail" "Not Yet Implemented: Helps you configure fail2ban"
+  printf "\n"
+}
 
 # Will present the main menu
 main() {
@@ -291,69 +358,7 @@ main() {
   fi
 
   while true; do
-    printf "${GREEN}%s${NC}\n" \
-      "Welcome to Michael's Linux Hardening Script (Competition Edition)"
-    printf "${GREEN}%s${NC}\n" \
-      "Options are organized into the sections Tools, Packages, Quick, and Heavy"
-    printf "${GREEN}%s${NC}\n" \
-      "Enter the name of an option below:"
-
-    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-      "Tools" "Useful for operation of the script"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "backup" "Will back up \"important directories\""
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "init" "Show inital information gathered at beginning of the script"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-      "pms" "Not Yet Implemented: Poor Man's SIEM"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "exit" "Exit program"
-
-    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-      "Packages" "Automated upgrades, removals, and installations"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "upgrade" "Upgrades the system"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "remove" "Asks to remove potentially unwanted packages"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "install" "Asks to install potentially helpful packages"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "download" "Asks to download potentially helpful software"
-
-    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-      "Quick" "Run instantly + don't require package installs (usually)"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "grub" "Configures bootloader parameters"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "perms" \
-      "Reconfigures permissions for files and directories"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "parts" "Sets secure mount options for partitions"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "modules" "Disables unused kernel modules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "sysctl" "Reconfigures kernel parameters"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "mac" "Sets up AppArmor/SELinux"
-
-    printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-      "Heavy" "May require package installs"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "fwinit" "Initializes the firewall on the system"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "fwconf" "Helps you configure in/out firewall rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "logs" "Initializes and configures journald or rsyslog"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "audit" "Initializes auditd configuration and rules"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-      "aide" "Initializes AIDE (may take awhile)"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-      "clam" "Not Yet Implemented: Initializes and configures ClamAV"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-      "fail" "Not Yet Implemented: Helps you configure fail2ban"
-    printf "\n"
-
+    print_main_menu
     while true; do
       read -rp "Enter an option: "
       case $REPLY in
@@ -395,8 +400,7 @@ main() {
                 remote_logging="rsyslog" && break
                 ;;
               *)
-                printf "${RED}%s${NC}\n" \
-                  "Unrecognized option, try again"
+                print_status message unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -413,8 +417,7 @@ main() {
                   option_one="false" && break
                   ;;
                 *)
-                  printf "${RED}%s${NC}\n" \
-                    "Unrecognized option, try again"
+                  print_status message unrecognized_option error "$option_one"
                   ;;
               esac
             done
@@ -431,8 +434,7 @@ main() {
                 option_two="false" && break
                 ;;
               *)
-                printf "${RED}%s${NC}\n" \
-                  "Unrecognized option, try again"
+                print_status message unrecognized_option error "$option_two"
                 ;;
             esac
           done
@@ -480,8 +482,7 @@ main() {
                 break
                 ;;
               *)
-                printf "${RED}%s${NC}\n" \
-                  "Unrecognized option, try again"
+                print_status message unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -498,8 +499,7 @@ main() {
                   break
                   ;;
                 *)
-                  printf "${RED}%s${NC}\n" \
-                    "Unrecognized option, try again"
+                  print_status message unrecognized_option error "$option_two"
                   ;;
               esac
             done
@@ -560,8 +560,7 @@ main() {
                 option_one="false" && break
                 ;;
               *)
-                printf "${RED}%s${NC}\n" \
-                  "Unrecognized option, try again"
+                print_status message unrecognized_option error "$option_one"
                 ;;
             esac
           done
@@ -584,7 +583,7 @@ main() {
           bash -l
           ;;
         *)
-          printf "${RED}%s${NC}\n" "Unrecognized option, try again"
+          print_status message unrecognized_option error "$REPLY"
           REPLY=""
           continue
           ;;

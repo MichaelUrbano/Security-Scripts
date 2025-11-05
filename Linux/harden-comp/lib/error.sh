@@ -184,19 +184,26 @@ prst_invalid_input() {
 }
 
 # Unrecognized option status message
-# print_status unrecognized_option "error|info" "input"
+# print_status unrecognized_option status "input" rude|kind
 prst_unrecognized_option() {
-  case "$1" in
+  local status="$1"
+  local input="$2"
+  local kindness="$3"
+  case "$status" in
     error) local status="ERROR" status_color="$EC" text_color="$RED" ;;
     warn) local status="WARN" status_color="$WC" text_color="$YELLOW" ;;
     info) local status="INFO" status_color="$IC" text_color="$BLUE" ;;
     success) local status="SUCCESS" status_color="$SC" text_color="$GREEN" ;;
     *) local status="UNKNOWN" status_color="$UC" text_color="$UC" ;;
   esac
-  printf "%b[%s]%b %bUnrecognized option:%b %b%s%b\n" \
+  printf "%b[%s]%b %bUnrecognized option:%b %b%s%b" \
     "$status_color" "$status" "$NC" \
     "$text_color" "$NC" \
-    "$text_color" "$2" "$NC"
+    "$text_color" "$input" "$NC"
+  case "$kindness" in
+    kind) printf "%b, please try again.%b\n" "$text_color" "$NC" ;;
+    rude | *) printf "%b, try again.%b\n" "$text_color" "$NC" ;;
+  esac
 }
 
 # object found in file alert message
