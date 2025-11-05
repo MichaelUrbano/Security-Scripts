@@ -18,7 +18,7 @@ jobs:
         run: |
           mkdir -p dist
           VERSION="${GITHUB_REF_NAME}"  # tag name
-          tar -cJf "dist/harden-comp-${VERSION}.tar.xz" -C Security-Scripts/Linux harden-comp
+          tar -cJf "dist/harden-comp-${VERSION}.tar.xz" -C Linux harden-comp
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
