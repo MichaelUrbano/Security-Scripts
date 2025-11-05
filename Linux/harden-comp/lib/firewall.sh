@@ -352,7 +352,7 @@ configure_firewall() {
       printf "\n"
       interface=""
     fi
-    printf "%bIs this information correct?%b" "$RED" "$NC"
+    printf "%bIs this information correct?%b\n" "$RED" "$NC"
     while true; do
       read -rp "(y/n): " reply
       case $reply in
@@ -393,7 +393,7 @@ configure_firewall() {
       done
     printf "\n"
     fi
-    printf "%bOnce more: is this information correct?\n%b" "${RED}${BOLD}" "$NC"
+    printf "%bOnce more: is this information correct?%b\n" "${RED}${BOLD}" "$NC"
     while true; do
       read -rp "(y/n): " reply
       case $reply in
@@ -578,15 +578,15 @@ configure_firewall() {
 
   fw_help() {
     jclr
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "a | append" "Allows you to append allow inbound rules to rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "t | toggle" "Allows you to toggle allow outbound rules on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "d | delete" "Will let you delete a specific inbound rule on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "r | reset" "Will delete all of your rules on rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "s | show" "Will show your rulelist"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "l | list" "Will list available service names"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "f | finalize" "Will implement your rulelist onto the permanent firewall configuration"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "h | help" "Will show you this prompt again"
-    printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" "q | quit" "Will quit to main menu, without saving any changes"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "a | append" "Allows you to append allow inbound rules to rulelist"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "t | toggle" "Allows you to toggle allow outbound rules on rulelist"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "d | delete" "Will let you delete a specific inbound rule on rulelist"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "r | reset" "Will delete all of your rules on rulelist"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "s | show" "Will show your rulelist"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "l | list" "Will list available service names"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "f | finalize" "Will implement your rulelist onto the permanent firewall configuration"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "h | help" "Will show you this prompt again"
+    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "q | quit" "Will quit to main menu, without saving any changes"
     printf "\n"
     printf "Before rules are applied to the real firewall configuration,\n"
     printf \
