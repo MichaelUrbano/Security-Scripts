@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="0.1.0"
+SCRIPT_VERSION="v1.0.0"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -120,7 +120,7 @@ OPTIONS:
   -p, --pkg-manager PM      override package manager
   -P, --skip-pkg-chk        skips check_installed_packages() inside of main()
   -q, --run-quick           run all options under Quick, then exit
-  -r, --run-backup          will run backup function
+  -r, --run-backup          will run backup, then exit
   -s, --skip-main           skips main() function
   -V, --distro-version VER  override distribution version
   -x, --xtrace              will set -x on the script, for debugging
@@ -171,15 +171,23 @@ Exit status:
  0  if OK,
  1  if any problems occur.
 
-Part of Security Scripts, by Michael Urbano.
-For more information, please visit GitHub.
+harden-comp.sh ${SCRIPT_VERSION}
+from Security Scripts
+For more information, please visit the GitHub page.
 <https://github.com/MichaelUrbano/Security-Scripts>.
-Report bugs, vulnerabilties, or other issues to git@michaelurbano.com
+Report bugs and issues on the Issues page.
+Report vulnerabilities directly to git@michaelurbano.com
 EOF
       exit 0
       ;;
     --version)
-      printf "%s\n" "$SCRIPT_VERSION"
+      cat << EOF
+harden-comp.sh ${SCRIPT_VERSION} from Security Scripts
+Copyright (C) 2025 Michael Urbano
+Licensed under the BSD 3-Clause License
+See: https://opensource.org/licenses/BSD-3-Clause
+
+EOF
       exit 0
       ;;
     -b | --backup)
