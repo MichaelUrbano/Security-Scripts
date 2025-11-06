@@ -17,6 +17,7 @@ jobs:
         run: |
           mkdir -p dist
           tar -cJf "dist/harden-comp.tar.xz" -C Linux harden-comp
+          chmod +x dist/harden-comp.tar.xz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
