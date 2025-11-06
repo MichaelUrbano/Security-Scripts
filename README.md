@@ -15,7 +15,7 @@ wget "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download
 ```
 or
 ```
-curl -LOJ "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden-comp-0.1.0-test1.tar.xz"
+curl -LOJ "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden-comp.tar.xz"
 ```
 then run
 ```
