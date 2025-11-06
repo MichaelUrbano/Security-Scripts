@@ -3,8 +3,7 @@ name: Package and Release harden-comp
 on:
   push:
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+'  # Runs when you push version tags
-      - '[0-9]+.[0-9]+.[0-9]+-*'  # 1.0.0-rc1, 1.0.0-beta1, etc
+      - 'v*'
 
 jobs:
   release:
@@ -17,16 +16,14 @@ jobs:
       - name: Create tar.xz archive
         run: |
           mkdir -p dist
-          VERSION="${GITHUB_REF_NAME}"  # tag name
-          tar -cJf "dist/harden-comp-${VERSION}.tar.xz" -C Linux harden-comp
+          tar -cJf "dist/harden-comp.tar.xz" -C Linux harden-comp
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Security-Scripts ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
-          files: dist/harden-comp-${{ github.ref_name }}.tar.xz
-          body: |
-            Automated release for `${{ github.ref_name }}`.
+          files: dist/harden-comp.tar.xz
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
