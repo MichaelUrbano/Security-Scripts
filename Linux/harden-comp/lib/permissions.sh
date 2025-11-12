@@ -191,7 +191,7 @@ configure_permissions() {
     "/var/log/messages*:f:root:root:0640"
   )
 
-  if [[ "$DISTRO" =~ ^(ubuntu|debian|opensuse.*)$ ]]; then
+  if [[ "$DISTRO" =~ ^(ubuntu|debian|sles|opensuse.*|suse)$ ]]; then
     permissions+=("${ubuntu_permissions[@]}")
   elif [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
     permissions+=("${rhel_permissions[@]}")
@@ -243,7 +243,7 @@ configure_permissions() {
     centos | rocky | almalinux | fedora | rhel | ol)
       log_files+=( "${rhel_logging[@]}" )
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       log_files+=( "${suse_logging[@]}" )
       ;;
     *)
@@ -278,7 +278,7 @@ configure_permissions() {
 
   # 5.1.2-3
   case "$DISTRO" in
-    ubuntu | debian | fedora | opensuse*)
+    ubuntu | debian | fedora | sles | opensuse* | suse)
       if [[ -d /etc/ssh ]]; then
         for file in /etc/ssh/*.pub; do
           [[ -e "$file" ]] || continue

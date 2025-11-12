@@ -47,7 +47,7 @@ init() {
     # freedesktop.org
     . /etc/os-release
     case "$ID" in
-      ubuntu | debian | opensuse.* | centos | rocky | almalinux | fedora | rhel | ol)
+      ubuntu | debian | sles | opensuse.* | suse | centos | rocky | almalinux | fedora | rhel | ol)
         DISTRO=$ID
         VER=$VERSION_ID
         ;;
@@ -97,7 +97,7 @@ init() {
         PKG_MANAGER="rpm"
       fi
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       PKG_MANAGER="zypper"
       ;;
     arch)
@@ -142,7 +142,7 @@ init() {
   print_status message info "Checking which services are enabled"
   # Check if commands are present, and/or if their services are enabled
   case "$DISTRO" in
-    ubuntu | debian | opensuse*)
+    ubuntu | debian | sles | opensuse* | suse)
       if systemctl is-active --quiet apparmor; then
         printf "%bapparmor.service%b: %brunning%b\n" \
           "$YELLOW" "$NC" "$GREEN" "$NC"
@@ -345,7 +345,7 @@ init() {
   fi
 
   # Checks if users are in the shadow group
-  if [[ "$DISTRO" =~ ^(debian|ubuntu|opensuse.*)$ ]]; then
+  if [[ "$DISTRO" =~ ^(debian|ubuntu|sles|opensuse.*|suse)$ ]]; then
     SHADOW_GID=$(awk -F: '($1 == "shadow")  { print $3 }' /etc/group)
     mapfile -t SHADOW_PGID < <(
       awk -F: -v SHADOW_GID="$SHADOW_GID" \

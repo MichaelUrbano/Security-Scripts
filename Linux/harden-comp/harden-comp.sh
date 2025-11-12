@@ -149,7 +149,7 @@ EXAMPLES:
 Short options or long options can be used exclusively, or combined,
 both forms are considered valid by the script.
 
-The DIST argument can be ubuntu, debian, opensuse, centos, rocky, almalinux,
+The DIST argument can be ubuntu, debian, sles, opensuse, suse, centos, rocky, almalinux,
 fedora, rhel, ol, or arch.
 Otherwise the script will attempt to automatically determine what the system's
 distribution is.

@@ -66,7 +66,7 @@ init_firewall() {
       nft add rule inet filter INPUT ip protocol udp ct state established accept
       nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
       nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
-      if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
+      if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse.*|suse)$ ]]; then
         nft list ruleset >/etc/sysconfig/nftables.conf
       elif [[ "$DISTRO" =~ ^(ubuntu|debian|arch)$ ]]; then
         nft list ruleset >/etc/nftables.conf
@@ -548,7 +548,7 @@ configure_firewall() {
         done
         nft chain inet filter INPUT '{ policy drop; }'
         nft chain inet filter OUTPUT '{ policy drop; }'
-        if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then
+        if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse.*|suse)$ ]]; then
           nft list ruleset >/etc/sysconfig/nftables.conf
         elif [[ "$DISTRO" =~ ^(ubuntu|debian|arch)$ ]]; then
           nft list ruleset >/etc/nftables.conf

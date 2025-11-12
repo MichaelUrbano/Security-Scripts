@@ -170,7 +170,7 @@ check_installed_packages() {
         { rpm -q "$pkg" &> /dev/null && PACKAGES+=("$pkg"); } || :
       done
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       local -ar candidate_pkgs=(
         autofs avahi dhcp-server bind dnsmasq samba openldap2 vsftpd dovecot
         cyrus-imapd nfs-kernel-server ypserv cups rpcbind rsync net-snmp
@@ -254,7 +254,7 @@ install_recommended_packages() {
         "selinux-policy-targeted"
       )
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       local -a packages=(
         "sudo" "apparmor-parser" "apparmor-profiles" "apparmor-utils"
         "libapparmor1" "audit" "aide"

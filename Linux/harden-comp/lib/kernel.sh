@@ -144,7 +144,7 @@ configure_grub() {
 
 configure_mac() {
   case "$DISTRO" in
-    ubuntu | debian | opensuse*)
+    ubuntu | debian | sles | opensuse* | suse)
       if ! command -v aa-enforce &> /dev/null; then
         print_status message_object error command \
           "Could not run" "aa-enforce"

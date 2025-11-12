@@ -221,7 +221,7 @@ EOF
 -e 2
 EOF
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       cat << 'EOF' >> /etc/audit/rules.d/99-hardening.rules
 # 6.3.3.5 (SUSE)
 -w /etc/hostname -p wa -k system-locale
@@ -287,7 +287,7 @@ configure_logging() {
     dpkg-query -s rsyslog &> /dev/null \
     && rsyslog_installed="true";
   } || :
-  elif [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|opensuse.*)$ ]]; then {
+  elif [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse.*|suse)$ ]]; then {
     rpm -q systemd-journal-remote &> /dev/null \
     && journal_remote_installed="true"
     } || :
@@ -386,7 +386,7 @@ configure_aide() {
       aide --init
       mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
       ;;
-    opensuse*)
+    sles | opensuse* | suse)
       aide -i
       /var/lib/aide/aide.db.new /var/lib/aide/aide.db
       ;;
