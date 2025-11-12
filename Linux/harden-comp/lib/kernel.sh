@@ -60,7 +60,7 @@ configure_sysctl() {
   )
 
   if [ $disable_ipv6 = "true" ]; then
-    settings["net.ipv6.conf.all.disable_ipv6"]="0"
+    settings["net.ipv6.conf.all.disable_ipv6"]="1"
   fi
 
   if [ ! -d "/etc/sysctl.d" ]; then
