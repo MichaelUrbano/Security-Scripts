@@ -17,9 +17,7 @@ init_firewall() {
       firewall-cmd --permanent --set-default-zone=public
       firewall-cmd --permanent --zone=trusted --add-interface=lo
       firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
-      firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
       firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
-      firewall-cmd --permanent --zone=trusted --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
       systemctl enable --now firewalld
       firewall-cmd --reload
     } || {
@@ -61,9 +59,12 @@ init_firewall() {
       nft list chain inet filter FORWARD &>/dev/null || nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
       nft list chain inet filter OUTPUT &>/dev/null || nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
       nft add rule inet filter INPUT iif lo accept
+      nft add rule inet filter INPUT oif lo accept
       nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
       nft add rule inet filter INPUT ip protocol tcp ct state established accept
       nft add rule inet filter INPUT ip protocol udp ct state established accept
+      nft add rule inet filter OUTPUT iif lo accept
+      nft add rule inet filter OUTPUT oif lo accept
       nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
       nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
       if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse.*|suse)$ ]]; then
