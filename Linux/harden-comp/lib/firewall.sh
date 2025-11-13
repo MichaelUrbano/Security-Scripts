@@ -11,113 +11,115 @@ init_firewall() {
     {
       print_status message info "Backing up configuration (if it exists)..."
       backup_firewall firewalld init
-      systemctl disable --now nftables &>/dev/null || true
-      systemctl disable --now netfilter-persistent &>/dev/null || true
-      systemctl disable --now ufw &>/dev/null || true
-      firewall-cmd --permanent --set-default-zone=public
+      systemctl disable --now nftables &> /dev/null || true
+      systemctl disable --now netfilter-persistent &> /dev/null || true
+      systemctl disable --now ufw &> /dev/null || true
+      firewall-cmd --permanent --set-default-zone=public || true
       firewall-cmd --permanent --zone=trusted --add-interface=lo
       firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address="127.0.0.1" destination not address="127.0.0.1" drop'
       firewall-cmd --permanent --add-rich-rule='rule family=ipv6 source address="::1" destination not address="::1" drop'
-      systemctl enable --now firewalld
-      firewall-cmd --reload
     } || {
       print_status message error \
         "Something went wrong, attempting to restore backup..."
       restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
+    systemctl enable --now firewalld || true
+    firewall-cmd --reload || true
 
   elif [[ " ${FIREWALLS[*]} " =~ " ufw " && $DISTRO =~ ^(ubuntu|debian)$ ]]; then
     {
       print_status message info "Backing up configuration (if it exists)..."
       backup_firewall ufw init
-      systemctl disable --now nftables &>/dev/null || true
-      systemctl disable --now netfilter-persistent &>/dev/null || true
-      systemctl disable --now firewalld &>/dev/null || true
+      systemctl disable --now nftables &> /dev/null || true
+      systemctl disable --now netfilter-persistent &> /dev/null || true
+      systemctl disable --now firewalld &> /dev/null || true
       ufw allow in on lo
       ufw allow out on lo
       ufw deny in from 127.0.0.0/8
       ufw deny in from ::1
-      systemctl enable --now ufw
-      ufw --force enable
     } || {
       print_status message error \
         "Something went wrong, attempting to restore backup..."
       restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
+      systemctl enable --now ufw || true
+      ufw --force enable || true
 
   elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
     {
       print_status message info "Backing up configuration (if it exists)..."
       backup_firewall nftables init
-      systemctl disable --now netfilter-persistent &>/dev/null || true
-      systemctl disable --now firewalld &>/dev/null || true
-      systemctl disable --now ufw &>/dev/null || true
-      nft list table inet filter &>/dev/null || nft create table inet filter
-      nft list chain inet filter INPUT &>/dev/null || nft create chain inet filter INPUT '{ type filter hook input priority filter ; }'
-      nft list chain inet filter FORWARD &>/dev/null || nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
-      nft list chain inet filter OUTPUT &>/dev/null || nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; }'
+      systemctl disable --now netfilter-persistent &> /dev/null || true
+      systemctl disable --now firewalld &> /dev/null || true
+      systemctl disable --now ufw &> /dev/null || true
+      nft list table inet filter &> /dev/null || nft create table inet filter
+      nft list chain inet filter INPUT &> /dev/null || nft create chain inet filter INPUT '{ type filter hook input priority filter ; policy accept ; }'
+      nft list chain inet filter FORWARD &> /dev/null || nft create chain inet filter FORWARD '{ type filter hook forward priority filter ; policy drop ; }'
+      nft list chain inet filter OUTPUT &> /dev/null || nft create chain inet filter OUTPUT '{ type filter hook output priority filter ; policy accept ; }'
       nft add rule inet filter INPUT iif lo accept
-      nft add rule inet filter INPUT oif lo accept
       nft add rule inet filter INPUT ip saddr 127.0.0.0/8 counter drop
       nft add rule inet filter INPUT ip protocol tcp ct state established accept
       nft add rule inet filter INPUT ip protocol udp ct state established accept
-      nft add rule inet filter OUTPUT iif lo accept
       nft add rule inet filter OUTPUT oif lo accept
-      nft add rule inet filter OUTPUT ip protocol tcp ct state new,related,established accept
-      nft add rule inet filter OUTPUT ip protocol udp ct state new,related,established accept
+      nft add rule inet filter OUTPUT ip protocol tcp ct state related,established accept
+      nft add rule inet filter OUTPUT ip protocol udp ct state related,established accept
       if [[ "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse.*|suse)$ ]]; then
-        nft list ruleset >/etc/sysconfig/nftables.conf
+        nft list ruleset > /etc/sysconfig/nftables.conf
       elif [[ "$DISTRO" =~ ^(ubuntu|debian|arch)$ ]]; then
-        nft list ruleset >/etc/nftables.conf
+        nft list ruleset > /etc/nftables.conf
       else
         print_status message_alt warn "Distribution could not be determined, placing in both" "/etc/nftables.conf and /etc/sysconfig/nftables.conf"
         printf "%b%s%b and %b%s%b\n" "$CYAN" "/etc/nftables.conf" "$NC" "$CYAN" "/etc/sysconfig/nftables.conf" "$NC"
         nft list ruleset | tee /etc/nftables.conf /etc/sysconfig/nftables.conf >/dev/null
       fi
-      systemctl enable --now nftables
     } || {
       print_status message error \
         "Something went wrong, attempting to restore backup..."
       restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
+      systemctl enable --now nftables
 
   elif [[ " ${FIREWALLS[*]} " =~ " iptables " ]]; then
     {
       print_status message info "Backing up configuration (if it exists)..."
       backup_firewall iptables init
-      systemctl disable --now nftables &>/dev/null || true
-      systemctl disable --now firewalld &>/dev/null || true
-      systemctl disable --now ufw &>/dev/null || true
-      iptables -F &>/dev/null || true
+      systemctl disable --now nftables &> /dev/null || true
+      systemctl disable --now firewalld &> /dev/null || true
+      systemctl disable --now ufw &> /dev/null || true
+      iptables -F &> /dev/null || true
+      iptables -P INPUT ACCEPT
+      iptables -P OUTPUT ACCEPT
       iptables -P FORWARD DROP
       iptables -A INPUT -i lo -j ACCEPT
       iptables -A OUTPUT -o lo -j ACCEPT
       iptables -A INPUT -s 127.0.0.0/8 -j DROP
-      iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
-      iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+      iptables -A OUTPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
+      iptables -A OUTPUT -p udp -m state --state RELATED,ESTABLISHED -j ACCEPT
       iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
       iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
-      iptables-save >/etc/iptables/rules.v4
+      iptables-save > /etc/iptables/rules.v4
       ip6tables -F &>/dev/null || true
+      ip6tables -P INPUT ACCEPT
+      ip6tables -P OUTPUT ACCEPT
       ip6tables -P FORWARD DROP
       ip6tables -A INPUT -i lo -j ACCEPT
       ip6tables -A OUTPUT -o lo -j ACCEPT
       ip6tables -A INPUT -s ::1 -j DROP
-      ip6tables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
-      ip6tables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+      ip6tables -A OUTPUT -p tcp -m state --state RELATED,ESTABLISHED -j ACCEPT
+      ip6tables -A OUTPUT -p udp -m state --state RELATED,ESTABLISHED -j ACCEPT
       ip6tables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
       ip6tables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
-      ip6tables-save >/etc/iptables/rules.v6
-      systemctl enable --now netfilter-persistent
+      ip6tables-save > /etc/iptables/rules.v6
     } || {
       print_status message error \
         "Something went wrong, attempting to restore backup..."
       restore_firewall || print_status message error "Backup restoration failed"
       return 1
     }
+    systemctl enable --now netfilter-persistent
   else
     print_status message error "Unrecognized firewall"
     return 1
@@ -133,9 +135,11 @@ configure_firewall() {
   fi
   # Check firewall being used on the system
   local active_firewall=""
-  if [[ " ${FIREWALLS[*]} " =~ " firewalld " && "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol)$ ]]; then
+  if [[ " ${FIREWALLS[*]} " =~ " firewalld " \
+    && "$DISTRO" =~ ^(centos|rocky|almalinux|fedora|rhel|ol|sles|opensuse*|suse)$ ]]; then
     active_firewall="firewalld"
-  elif [[ " ${FIREWALLS[*]} " =~ " ufw " && "$DISTRO" =~ ^(ubuntu|debian)$ ]]; then
+  elif [[ " ${FIREWALLS[*]} " =~ " ufw " \
+    && "$DISTRO" =~ ^(ubuntu|debian)$ ]]; then
     active_firewall="ufw"
   elif [[ " ${FIREWALLS[*]} " =~ " nftables " ]]; then
     active_firewall="nftables"
@@ -151,6 +155,7 @@ configure_firewall() {
     ["http:80/tcp"]="ALLOW"
     ["https:443/tcp"]="ALLOW"
     ["dns:53/udp"]="ALLOW"
+    ["dhcp-client:68/udp"]="ALLOW"
     ["ntp:123/udp"]="ALLOW"
     ["dns-xfr:53/tcp"]="DROP"
   )
@@ -158,6 +163,7 @@ configure_firewall() {
     ftp-data:20/tcp
     ftp:21/tcp
     ssh:22/tcp
+    telnet:23/tcp
     smtp:25/tcp
     dns:53/udp
     dns-xfr:53/tcp
@@ -328,6 +334,10 @@ configure_firewall() {
 
   fw_show_inbound() {
     local rule=""
+    if [[ "${#rulelist[@]}" -le 0 ]]; then
+      print_status message info "Rulelist is empty"
+      return 0
+    fi
     for rule in "${rulelist[@]}"; do
       printf "%b%s%b " "$YELLOW" "$rule" "$NC"
     done
@@ -337,10 +347,10 @@ configure_firewall() {
   fw_show_outbound() {
     for outbound_service in "${!outbound_rulelist[@]}"; do
       if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
-        printf "%-15s : %b%7s%b\n" \
+        printf "%-20s : %b%7s%b\n" \
           "$outbound_service" "${GREEN}${BOLD}" "ALLOW" "$NC"
       else
-        printf "%-15s : %b%7s%b\n" \
+        printf "%-20s : %b%7s%b\n" \
           "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
       fi
     done
