@@ -326,65 +326,64 @@ fi
 
 # Print the options available
 print_main_menu() {
-  printf "${GREEN}${BOLD}%s${NC}\n" \
-    "Welcome to harden-comp.sh"
-  printf "${GREEN}%s${NC}\n" \
-    "Options are organized into the sections Tools, Packages, Quick, and Heavy"
-  printf "${GREEN}%s${NC}\n" \
-    "Enter the name of an option below:"
+  printf "%b%s%b\n" "${GREEN}${BOLD}" "Welcome to harden-comp.sh" "${NC}"
+  printf "%b%s%b\n" "${GREEN}" \
+    "Options are organized into the sections Tools, Packages, Quick, and Heavy" \
+    "${NC}"
+  printf "%b%s%b\n" "$GREEN" "Enter the name of an option below:" "$NC"
 
-  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-    "Tools" "Useful for operation of the script"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "backup" "Will back up \"important directories\""
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "init" "Show inital information gathered at beginning of the script"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t ${RED}%s${NC}\n" \
-    "pms" "Not Yet Implemented: Poor Man's SIEM"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "bash" "Enter a bash login shell within the script"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "exit" "Exit program"
+  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Tools" "${GREEN}" \
+    "Useful for operation of the script"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "B | backup" "${NC}" \
+    "Will backup \"important directories\""
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "i | init" "${NC}" \
+    "Show initial information gathered at beginning of the script"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "p | pms" "${NC}" \
+    "Not Yet Implemented: Poor Man's SIEM"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "b | bash" "${NC}" \
+    "Enter a bash login shell within the script"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "q | quit" \
+    "${NC}" "Exit program"
 
-  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-    "Packages" "Automated upgrades, removals, and installations"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "upgrade" "Upgrades the system"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "remove" "Asks to remove potentially unwanted packages"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "install" "Asks to install potentially helpful packages"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "download" "Asks to download potentially helpful software"
+  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Packages" "${GREEN}" \
+    "Automated upgrades, removals, and installations"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "up | upgrade" "${NC}" \
+    "Upgrades the system"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "rm | remove" "${NC}" \
+    "Asks to remove potentially unwanted packages"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "in | install" "${NC}" \
+    "Asks to install potentially helpful packages"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "dl | download" "${NC}" \
+    "Asks to download potentially helpful software"
 
-  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-    "Quick" "Run instantly + don't require package installs (usually)"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "grub" "Configures bootloader parameters"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "perms" \
+  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Quick" "${GREEN}" \
+    "Run instantly + don't require package installs (usually)"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "grub" "${NC}" \
+    "Configures bootloader parameters"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "perms" "${NC}" \
     "Reconfigures permissions for files and directories"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "parts" "Sets secure mount options for partitions"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "modules" "Disables unused kernel modules"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "sysctl" "Reconfigures kernel parameters"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "mac" "Sets up AppArmor/SELinux"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "parts" "${NC}" \
+    "Sets secure mount options for partitions"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "mods" "${NC}" \
+    "Disables unused kernel modules"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "sys" "${NC}" \
+    "Reconfigures kernel parameters"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "mac" "${NC}" \
+    "Sets up AppArmor/SELinux"
 
-  printf "\n${GREEN}${BOLD}%-10s${NC}${GREEN} :\t %s\n" \
-    "Heavy" "May require package installs"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "fwinit" "Initializes the firewall on the system"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "fwconf" "Helps you configure in/out firewall rules"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "logs" "Initializes and configures journald or rsyslog"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "audit" "Initializes auditd configuration and rules"
-  printf "${YELLOW}${BOLD}%-10s${NC} :\t %s\n" \
-    "aide" "Initializes AIDE (may take awhile)"
+  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Heavy" "${GREEN}" \
+    "May require package installs"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "fwi | fwinit" "${NC}" \
+    "Initializes the firewall on the system"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "fwc | fwconf" "${NC}" \
+    "Helps you configure in/out firewall rules"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "log | logging" "${NC}" \
+    "Initializes and configures journald or rsyslog"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "aud | audit" "${NC}" \
+    "Initializes auditd configuration and rules"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "aid | aide" "${NC}" \
+    "Initializes AIDE (may take awhile)"
+
   printf "\n"
 }
 
@@ -417,12 +416,12 @@ main() {
             || print_status unsuccessful_function error \
               "backup_directories"
           ;;
-        upgrade | u)
+        upgrade | up)
           upgrade_system "$PKG_MANAGER" \
             || print_status unsuccessful_function error \
               "upgrade_system"
           ;;
-        remove | r)
+        remove | rm)
           print_status message warn \
             "Potentially unwated packages found:"
           for pkg in "${PACKAGES[@]}"; do
@@ -435,7 +434,7 @@ main() {
             || print_status unsuccessful_function error \
               "check_installed_packages"
           ;;
-        install | i)
+        install | in)
           local option_one
           local option_two
           local remote_logging="journal_remote"
@@ -497,7 +496,7 @@ main() {
           option_one=""
           option_two=""
           ;;
-        download | d)
+        download | dl)
           download_software \
           || print_status unsuccessful_function error \
             "download_software"
@@ -518,7 +517,7 @@ main() {
             || print_status unsuccessful_function error \
               "configure_firewall"
           ;;
-        logs)
+        logging | log)
           local option_one="false"
           local option_two="false"
           local journal_remote="false"
@@ -560,20 +559,15 @@ main() {
             || print_status unsuccessful_function error \
               "configure_logging"
           ;;
-        audit | au)
+        audit | aud)
           configure_auditd \
             || print_status unsuccessful_function error \
               "configure_auditd"
           ;;
-        aide)
+        aide | aid)
           configure_aide \
             || print_status unsuccessful_function error \
               "configure_aide"
-          ;;
-        fail)
-          configure_fail2ban \
-            || print_status unsuccessful_function error \
-              "configure_fail2ban"
           ;;
         grub)
           configure_grub \
@@ -590,12 +584,12 @@ main() {
             || print_status unsuccessful_function error \
               "configure_partitions"
           ;;
-        modules | mods)
+        mods)
           disable_kernel_modules \
             || print_status unsuccessful_function error \
               "disable_kernel_modules"
           ;;
-        sysctl)
+        sys)
           local option_one
           while true; do
             read -rp "Disable IPv6? (y/n): " option_one
@@ -615,16 +609,16 @@ main() {
           configure_sysctl "disable_ipv6=$option_one"
           option_one=""
           ;;
-        init)
+        init | i)
           jclr
           init
           override
           read -rp "Press enter to continue "
           ;;
-        exit | quit | q | ex) 
+        quit | q) 
           exit 0
           ;;
-        bash)
+        bash | B)
           jclr
           print_status message info \
             "Placing you into a bash shell... Use ctrl + d/exit to exit"

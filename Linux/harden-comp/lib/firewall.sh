@@ -311,6 +311,7 @@ configure_firewall() {
       jclr
       fw_show_outbound
       printf "%bq%b to exit\n" "${YELLOW}${BOLD}" "$NC"
+      printf "%bip%b to toggle IP blocking\n" "${YELLOW}${BOLD}" "$NC"
       read -rp "Enter service name to toggle (q to exit): " reply
       case "$reply" in
         q)
