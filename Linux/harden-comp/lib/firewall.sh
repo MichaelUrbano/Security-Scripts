@@ -150,6 +150,7 @@ configure_firewall() {
     return 1
   fi
 
+  local ip_blocking="disabled"
   local -a rulelist=()
   local -A outbound_rulelist=(
     ["http:80/tcp"]="ALLOW"
@@ -315,6 +316,13 @@ configure_firewall() {
         q)
           return 0
           ;;
+        ip)
+          if [[ "$ip_blocking" == "disabled" ]]; then
+            ip_blocking="enabled"
+          else
+            ip_blocking="disabled"
+          fi
+          ;;
         *)
           # TODO: excessive nesting, needs to be cleaned
           for outbound_service in "${!outbound_rulelist[@]}"; do
@@ -354,6 +362,12 @@ configure_firewall() {
           "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
       fi
     done
+    printf "%bALLOW%b only specific IPs: " "${GREEN}${BOLD}" "$NC"
+    if [[ $ip_blocking == "enabled" ]]; then
+      printf "%b%s%b\n" "${GREEN}${BOLD}" "ENABLED" "$NC"
+    else
+      printf "%b%s%b\n" "${RED}${BOLD}" "DISABLED" "$NC"
+    fi
   }
 
   fw_list_services() {
@@ -463,7 +477,7 @@ configure_firewall() {
     jclr
     print_status message_object info firewall \
       "Applying rules to" "$active_firewall"
-
+    print_status message warn "Specific IP blocking for outbound ports is not yet available"
     # There is no default drop policy for output packets on firewalld,
     # therefore rich rules have to be used
     if [[ "$active_firewall" = "firewalld" ]]; then

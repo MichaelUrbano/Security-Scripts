@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="v1.0.0"
+SCRIPT_VERSION="v1.0.1"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -327,7 +327,7 @@ fi
 # Print the options available
 print_main_menu() {
   printf "${GREEN}${BOLD}%s${NC}\n" \
-    "Welcome to Michael's Linux Hardening Script (Competition Edition)"
+    "Welcome to harden-comp.sh"
   printf "${GREEN}%s${NC}\n" \
     "Options are organized into the sections Tools, Packages, Quick, and Heavy"
   printf "${GREEN}%s${NC}\n" \
