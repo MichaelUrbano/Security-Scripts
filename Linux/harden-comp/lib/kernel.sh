@@ -40,7 +40,7 @@ configure_sysctl() {
       disable_ipv6=true) disable_ipv6="true" ;;
       disable_ipv6=false) disable_ipv6="false" ;;
       *)
-        echo "Unrecognized argument: $arg" >&2
+        print_status unrecognized_option error "$arg" rude
         return 1
         ;;
     esac

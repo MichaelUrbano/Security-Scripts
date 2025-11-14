@@ -95,38 +95,38 @@ remove_package() {
 upgrade_system() {
   local package_manager="$1"
   if [[ -z "$package_manager" ]]; then
-    echo "Error: No package manager provided to upgrade_system."
+    print_status message error "No package manager provided"
     return 1
   fi
 
   if [[ "$package_manager" == "unsupported" ]]; then
-    echo "Error: Unsupported operating system."
+    print_status message error "Unsupported package manager"
     return 1
   fi
 
   case "$package_manager" in
     apt)
-      echo "Using apt to upgrade system..."
+      print_status using_to info upgrade "apt"
       apt update && apt upgrade -y
       ;;
     dnf)
-      echo "Using dnf to upgrade system..."
+      print_status using_to info upgrade "dnf"
       dnf upgrade -y
       ;;
     yum)
-      echo "Using yum to upgrade system..."
+      print_status using_to info upgrade "yum"
       yum upgrade -y
       ;;
     zypper)
-      echo "Using zypper to upgrade system..."
+      print_status using_to info upgrade "zypper"
       zypper up
       ;;
     pacman)
-      echo "Using pacman to upgrade system..."
+      print_status using_to info upgrade "pacman"
       pacman -Syu --noconfirm
       ;;
     *)
-      echo "Error: Unsupported package manager."
+      print_status message error "Unsupported package manager"
       return 1
       ;;
   esac
@@ -199,8 +199,17 @@ ask_to_remove_packages() {
       "There are no packages to remove (Did you use -P by accident?)"
     return 0
   fi
-  echo -e "${BLUE}You will be asked if you want to remove each package${NC}"
-  echo -e "${BLUE}look carefully at each, and determine if they are necessary or not.${NC}"
+  print_status message warn \
+    "Potentially unwated packages found:"
+  for pkg in "${PACKAGES[@]}"; do
+    printf "%b%s%b " "$RED" "$pkg" "$NC"
+  done
+  printf "\n"
+  print_status message alert \
+    "You will be asked if you want to remove packages, individually."
+  printf "%bCarefully inspect all packages being removed,%b\n" "$EC" "$NC"
+  printf "%band determine if removal would break something,%b\n" "$EC" "$NC"
+  printf "%bor improve security%b\n" "$EC" "$NC"
   local pkg
   for pkg in "${PACKAGES[@]}"; do
     remove_package "$PKG_MANAGER" "$pkg" || true

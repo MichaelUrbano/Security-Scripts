@@ -32,7 +32,6 @@
 
 # TODO: auditd autoconfig (6.2), including adding .rules files to /etc/audit/rules.d/ (specified in 6.2.3)
 
-# TODO: Use printf instead of echo where appropriate
 # TODO: Implement a logging system
 
 # TODO: automated download of Wazuh deb/rpm

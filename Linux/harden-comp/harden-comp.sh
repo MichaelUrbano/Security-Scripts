@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="v1.0.1"
+SCRIPT_VERSION="v1.0.2"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -422,11 +422,6 @@ main() {
               "upgrade_system"
           ;;
         remove | rm)
-          print_status message warn \
-            "Potentially unwated packages found:"
-          for pkg in "${PACKAGES[@]}"; do
-            printf "%b%s%b " "$RED" "$pkg" "$NC"
-          done
           ask_to_remove_packages \
             || print_status unsuccessful_function error \
               "ask_to_remove_packages"

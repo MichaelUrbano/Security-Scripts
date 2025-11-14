@@ -135,7 +135,7 @@ prst_already_exists() {
 }
 
 # using "package-manager" to install "package"
-# print_status using_to status "install|remove" "package-manager" "package"
+# print_status using_to status "action" "package-manager" "package"
 prst_using_to() {
   local input_status="${1:-unknown}"
   local input_action="${2:-unknown}"
@@ -152,6 +152,7 @@ prst_using_to() {
   case "$input_action" in
     install) local action="install" ;;
     remove) local action="remove" ;;
+    upgrade) local action="upgrade" && input_package="the system" ;;
     *) local action="$input_action" ;;
   esac
   printf "%b[%s]%b %bUsing%b %b%s%b %bto %s%b %b%s%b\n" \
