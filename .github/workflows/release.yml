@@ -16,15 +16,15 @@ jobs:
       - name: Create tar.xz archive
         run: |
           mkdir -p dist
-          chmod +x Linux/harden-comp/harden-comp.sh
-          tar -cJf "dist/harden-comp.tar.xz" -C Linux harden-comp
+          chmod +x Linux/harden/harden.sh
+          tar -cJf "dist/harden.tar.xz" -C Linux harden
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Security Scripts ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
-          files: dist/harden-comp.tar.xz
+          files: dist/harden.tar.xz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}

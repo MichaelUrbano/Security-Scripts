@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # PLEASE NOTE:
 # "Legacy" version of the script, before functions were placed into multiple separate shell scripts

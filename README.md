@@ -2,7 +2,7 @@
 
 This repository contains various scripts which can be used in either competitions, for hardening systems, or whatever use you may see fit.
 
-## `harden-comp.sh`
+## `harden.sh`
 This is a hardening script intended for use in cybersecurity competitions. It was specially made for a specific competition, though I wont specify just yet, as to not attract unwanted eyes...
 ### Supported Distributions:
  - Debian
@@ -11,21 +11,21 @@ This is a hardening script intended for use in cybersecurity competitions. It wa
  - OpenSUSE
 ### Download Instructions
 ```
-wget "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden-comp.tar.xz"
+wget "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden.tar.xz"
 ```
 or
 ```
-curl -LOJ "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden-comp.tar.xz"
+curl -LOJ "https://github.com/MichaelUrbano/Security-Scripts/releases/latest/download/harden.tar.xz"
 ```
 then run
 ```
-tar -xvJf harden-comp.tar.xz
-cd harden-comp
-sudo ./harden-comp.sh
+tar -xvJf harden.tar.xz
+cd harden
+sudo ./harden.sh
 ```
 You can use the `-h` option to view help information.
 ```
-Usage: sudo ./harden-comp.sh [OPTIONS]...
+Usage: sudo ./harden.sh [OPTIONS]...
 Hardening and utility script for competitions
 
 OPTIONS:
@@ -53,22 +53,22 @@ OPTIONS:
 
 EXAMPLES:
   Set full backup directory as /srv/backups/b4
-  sudo ./harden-comp.sh --backup /srv/backups
+  sudo ./harden.sh --backup /srv/backups
 
   Set backup directory as /srv/backups and backup subdirectory as /alt
-  sudo ./harden-comp.sh -b /srv/backups -B /alt
+  sudo ./harden.sh -b /srv/backups -B /alt
 
   Set backup directory as /backups and backup subdirectory as /alt and set -x
-  sudo ./harden-comp.sh --backup /backups -B /alt -x
+  sudo ./harden.sh --backup /backups -B /alt -x
 
   Set full backup directory as /usr/bin/alt and override firewall to nftables
-  sudo ./harden-comp.sh --backup-subdir /alt -f nftables
+  sudo ./harden.sh --backup-subdir /alt -f nftables
 
   Set backup directory as /backups and backup subdirectory as /net and skip main
-  sudo ./harden-comp.sh -b /backups --backup-subdir /net -s
+  sudo ./harden.sh -b /backups --backup-subdir /net -s
 
   Override distribution to fedora, package manager to yum, and firewall to ufw
-  sudo ./harden-comp.sh -d fedora -p yum -f ufw
+  sudo ./harden.sh -d fedora -p yum -f ufw
 
 Short options or long options can be used exclusively, or combined,
 both forms are considered valid by the script.

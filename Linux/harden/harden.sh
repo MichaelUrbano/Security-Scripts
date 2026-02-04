@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="v1.0.3"
+SCRIPT_VERSION="v1.0.4"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -101,7 +101,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)
       cat << EOF
-Usage: sudo ./$0 [OPTIONS]...
+Usage: sudo $0 [OPTIONS]...
 Hardening and utility script for competitions
 
 OPTIONS:
@@ -129,22 +129,22 @@ OPTIONS:
 
 EXAMPLES:
   Set full backup directory as /srv/backups/b4
-  sudo ./harden-comp.sh --backup /srv/backups
+  sudo $0 --backup /srv/backups
 
   Set backup directory as /srv/backups and backup subdirectory as /alt
-  sudo ./harden-comp.sh -b /srv/backups -B /alt
+  sudo $0 -b /srv/backups -B /alt
 
   Set backup directory as /backups and backup subdirectory as /alt and set -x
-  sudo ./harden-comp.sh --backup /backups -B /alt -x
+  sudo $0 --backup /backups -B /alt -x
 
   Set full backup directory as /usr/bin/alt and override firewall to nftables
-  sudo ./harden-comp.sh --backup-subdir /alt -f nftables
+  sudo $0 --backup-subdir /alt -f nftables
 
   Set backup directory as /backups and backup subdirectory as /net and skip main
-  sudo ./harden-comp.sh -b /backups --backup-subdir /net -s
+  sudo $0 -b /backups --backup-subdir /net -s
 
   Override distribution to fedora, package manager to yum, and firewall to ufw
-  sudo ./harden-comp.sh -d fedora -p yum -f ufw
+  sudo $0 -d fedora -p yum -f ufw
 
 Short options or long options can be used exclusively, or combined,
 both forms are considered valid by the script.
@@ -171,7 +171,7 @@ Exit status:
  0  if OK,
  1  if any problems occur.
 
-harden-comp.sh ${SCRIPT_VERSION}
+harden.sh ${SCRIPT_VERSION}
 from Security Scripts
 For more information, please visit the GitHub page.
 <https://github.com/MichaelUrbano/Security-Scripts>.
@@ -182,7 +182,7 @@ EOF
       ;;
     --version)
       cat << EOF
-harden-comp.sh ${SCRIPT_VERSION} from Security Scripts
+harden.sh ${SCRIPT_VERSION} from Security Scripts
 Copyright (C) 2025 Michael Urbano
 Licensed under the BSD 3-Clause License
 See: https://opensource.org/licenses/BSD-3-Clause
@@ -274,8 +274,8 @@ EOF
       shift
       ;;
     *)
-      printf "Usage: sudo ./harden-comp.sh [OPTIONS]...\n"
-      printf "Try './harden-comp.sh -h' for more information.\n"
+      printf "Usage: sudo %s [OPTIONS]...\n" "$0"
+      printf "Try '%s -h' for more information.\n" "$0"
       exit 1
   esac
 done
@@ -334,13 +334,13 @@ print_main_menu() {
 
   printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Tools" "${GREEN}" \
     "Useful for operation of the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "B | backup" "${NC}" \
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "b | backup" "${NC}" \
     "Will backup \"important directories\""
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "i | init" "${NC}" \
     "Show initial information gathered at beginning of the script"
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "p | pms" "${NC}" \
     "Not Yet Implemented: Poor Man's SIEM"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "b | bash" "${NC}" \
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "B | bash" "${NC}" \
     "Enter a bash login shell within the script"
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "q | quit" \
     "${NC}" "Exit program"
