@@ -326,7 +326,7 @@ fi
 
 # Print the options available
 print_main_menu() {
-  printf "%b%s%b\n" "${GREEN}${BOLD}" "Welcome to harden-comp.sh" "${NC}"
+  printf "%b%s%b\n" "${GREEN}${BOLD}" "Welcome to harden.sh" "${NC}"
   printf "%b%s%b\n" "${GREEN}" \
     "Options are organized into the sections Tools, Packages, Quick, and Heavy" \
     "${NC}"
@@ -409,7 +409,7 @@ main() {
   while true; do
     print_main_menu
     while true; do
-      read -rp "harden-comp> "
+      read -rp "harden> "
       case $REPLY in
         backup | b)
           backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \

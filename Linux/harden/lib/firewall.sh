@@ -152,13 +152,19 @@ configure_firewall() {
 
   local ip_blocking="disabled"
   local -a rulelist=()
+
+  # rulelist of possible outbound ports, with a default value of ALLOW or DROP next to it
   local -A outbound_rulelist=(
     ["http:80/tcp"]="ALLOW"
     ["https:443/tcp"]="ALLOW"
     ["dns:53/udp"]="ALLOW"
+    ["dns-xfr:53/tcp"]="DROP"
     ["dhcp-client:68/udp"]="ALLOW"
     ["ntp:123/udp"]="ALLOW"
-    ["dns-xfr:53/tcp"]="DROP"
+    ["wazuh-agent:1514/tcp"]="ALLOW"
+    ["wazuh-enroll:1515/tcp"]="ALLOW"
+    ["wazuh-api:55000/tcp"]="ALLOW"
+    ["splunk-agent:9997/tcp"]="DROP"
   )
   local -ar service_ports=(
     ftp-data:20/tcp
@@ -195,10 +201,16 @@ configure_firewall() {
     ftps:990/tcp
     imaps:993/tcp
     pops:995/tcp
+    wazuh-agent:1514/tcp
+    wazuh-enroll:1515/tcp
     mysql:3306/tcp
     rdp:3389/tcp
     rdp-udp:3389/udp
     vnc:5900/tcp
+    splunk:8089/tcp
+    wazuh-indexer:9200/tcp
+    splunk-agent:9997/tcp
+    wazuh-api:55000/tcp
   )
 
   fw_add_rules() {
