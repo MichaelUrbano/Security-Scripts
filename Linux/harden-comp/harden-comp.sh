@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck source=/dev/null
 
 # Want to get close to Google's styleguide?
@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="v1.0.2"
+SCRIPT_VERSION="v1.0.3"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -101,7 +101,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)
       cat << EOF
-Usage: sudo ./harden-comp.sh [OPTIONS]...
+Usage: sudo ./$0 [OPTIONS]...
 Hardening and utility script for competitions
 
 OPTIONS:

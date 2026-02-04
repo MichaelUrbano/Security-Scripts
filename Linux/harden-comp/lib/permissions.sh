@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # CIS Ubuntu: 1.1.2
 # We only want to do /tmp and /dev/shm, any related to /home or /var are out of scope

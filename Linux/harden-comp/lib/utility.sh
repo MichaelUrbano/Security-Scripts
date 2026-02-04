@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Basic tar backup function for /etc, /var/www/html, and /opt 
 # to directory specified with -b, defaults to /usr/sbin if unspecified

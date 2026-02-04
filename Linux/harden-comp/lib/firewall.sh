@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 init_firewall() {
   # CIS Debian 12: 4.1

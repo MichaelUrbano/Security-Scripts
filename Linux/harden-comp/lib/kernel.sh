@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # CIS Ubuntu 12: 1.1.1.1-5,8-9, 3.2
 # 1.1.1.10 to be added
