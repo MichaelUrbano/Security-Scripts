@@ -19,6 +19,58 @@ pclr() {
   [ -t 1 ] && clear;
 }
 
+check_distro() {
+  if [[ -f /etc/os-release ]]; then
+    # freedesktop.org
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    local distro="unknown", is_supported="false"
+    for distro in "${SUPPORTED_DISTROS[@]}"; do
+      if [[ "$ID" =~ $distro ]]; then
+        is_supported="true"
+        break
+      fi
+    done
+    if [[ "$is_supported" != "true" && "$ID_LIKE" != "" ]]; then
+      DISTRO=${ID_LIKE%% *}
+      VER="?"
+    else
+      DISTRO=$ID
+      VER=$VERSION_ID
+    fi
+
+  elif type lsb_release &>/dev/null; then
+    # linuxbase.org
+    DISTRO=$(lsb_release -si)
+    VER=$(lsb_release -sr)
+  elif [[ -f /etc/lsb-release ]]; then
+    # For some versions of Debian/Ubuntu without lsb_release command
+    # shellcheck disable=SC1091
+    . /etc/lsb-release
+    DISTRO=$DISTRIB_ID
+    VER=$DISTRIB_RELEASE
+  elif [[ -f /etc/debian_version ]]; then
+    # Older Debian/Ubuntu/etc.
+    DISTRO=Debian
+    VER=$(cat /etc/debian_version)
+  elif command -v uname; then
+    # Fall back to uname
+    DISTRO=$(uname -s)
+    VER=$(uname -r)
+  else
+    DISTRO="unknown"
+    VER="?"
+  fi
+}
+
+check_package_manager() {
+  return 1
+}
+
+check_firewall() {
+  return 1
+}
+
 check_cron() {
   return 1
 }
@@ -42,40 +94,14 @@ check_users_and_groups() {
 # Checks system information and sets up global variables needed for functions
 init() {
   print_status message info "Checking system information..."
-  # Determine distro being used
-  if [[ -f /etc/os-release ]]; then
-    # freedesktop.org
-    . /etc/os-release
-    case "$ID" in
-      ubuntu | debian | sles | opensuse.* | suse | centos | rocky | almalinux | fedora | rhel | ol)
-        DISTRO=$ID
-        VER=$VERSION_ID
-        ;;
-      *)
-        DISTRO=${ID_LIKE%% *}
-        VER="?"
-        ;;
-    esac
-  elif type lsb_release &>/dev/null; then
-    # linuxbase.org
-    DISTRO=$(lsb_release -si)
-    VER=$(lsb_release -sr)
-  elif [[ -f /etc/lsb-release ]]; then
-    # For some versions of Debian/Ubuntu without lsb_release command
-    . /etc/lsb-release
-    DISTRO=$DISTRIB_ID
-    VER=$DISTRIB_RELEASE
-  elif [[ -f /etc/debian_version ]]; then
-    # Older Debian/Ubuntu/etc.
-    DISTRO=Debian
-    VER=$(cat /etc/debian_version)
-  else
-    # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
-    DISTRO=$(uname -s)
-    VER=$(uname -r)
-  fi
+  check_distro
   DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
-  printf "%bDistribution ID:%b %s %s\n" "${GREEN}" "${NC}" "$DISTRO" "$VER"
+  if [[ "$DISTRO" =~ $REGEX_ALL_DISTROS ]]; then
+    printf "%bDistribution ID:%b %s %s\n" "${GREEN}" "${NC}" "$DISTRO" "$VER"
+  else
+    print_status message warn "You are running on an unsupported distribution. Are you testing?"
+    printf "%bDistribution ID:%b %b%b%s %s%b\n" "${GREEN}" "${NC}" "${CYAN}" "${BOLD}" "$DISTRO" "$VER" "${NC}"
+  fi 
 
   # Choose correct package manager for distro
   case "$DISTRO" in

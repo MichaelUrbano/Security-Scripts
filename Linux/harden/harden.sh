@@ -9,7 +9,7 @@
 set -euo pipefail
 set +H
 
-SCRIPT_VERSION="v1.0.4"
+SCRIPT_VERSION="BUILD-UNKNOWN"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -41,6 +41,27 @@ readonly WC="${YELLOW}${BOLD}" # [WARN]
 readonly IC="${BLUE}${BOLD}"   # [INFO]
 readonly SC="${GREEN}${BOLD}"  # [SUCCESS]
 readonly UC="\033[1;4;43;31m"  # [UNKNOWN]
+
+# List of Linux Distributions supported by the script
+declare -ar SUPPORTED_DISTROS=(
+  "ubuntu"
+  "debian"
+  "sles"
+  "opensuse"
+  "suse"
+  "centos" 
+  "rocky" 
+  "almalinux" 
+  "ol" 
+  "fedora" 
+  "rhel"
+)
+
+# Regex containing Linux distributions supported by the script
+readonly REGEX_ALL_DISTROS='^(ubuntu|debian|sles|opensuse.*|suse|centos|rocky|almalinux|ol|fedora|rhel)$'
+readonly REGEX_DEB_DISTROS='^(ubuntu|debian)$'
+readonly REGEX_SUSE_DISTROS='^(sles|opensuse.*|suse)$'
+readonly REGEX_RPM_DISTROS='^(centos|rocky|almalinux|ol|fedora|rhel)$'
 
 # For testing purposes, will execute before init() within main()
 do_before() {
@@ -183,7 +204,7 @@ EOF
     --version)
       cat << EOF
 harden.sh ${SCRIPT_VERSION} from Security Scripts
-Copyright (C) 2025 Michael Urbano
+Copyright (C) 2025 - 2026 Michael Urbano
 Licensed under the BSD 3-Clause License
 See: https://opensource.org/licenses/BSD-3-Clause
 
