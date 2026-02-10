@@ -126,12 +126,12 @@ configure_permissions() {
     "/etc/issue:f:root:root:0644"          # 1.6.5
     "/etc/issue.net:f:root:root:0644"      # 1.6.6
     "/etc/crontab:f:root:root:0600"        # 2.4.1.2
-    "/etc/cron.hourly:d:root:root:0600"    # 2.4.1.3
-    "/etc/cron.daily:d:root:root:0600"     # 2.4.1.4
-    "/etc/cron.weekly:d:root:root:0600"    # 2.4.1.5
-    "/etc/cron.monthly:d:root:root:0600"   # 2.4.1.6
-    "/etc/cron.d:d:root:root:0600"         # 2.4.1.7
-    "/etc/cron.yearly:d:root:root:0600"
+    "/etc/cron.hourly:d:root:root:0700"    # 2.4.1.3
+    "/etc/cron.daily:d:root:root:0700"     # 2.4.1.4
+    "/etc/cron.weekly:d:root:root:0700"    # 2.4.1.5
+    "/etc/cron.monthly:d:root:root:0700"   # 2.4.1.6
+    "/etc/cron.d:d:root:root:0700"         # 2.4.1.7
+    "/etc/cron.yearly:d:root:root:0700"    # Doesn't always exist
     "/etc/at.allow:f:root:daemon:0640"           # 2.4.2.1
     "/etc/at.deny:f:root:daemon:0640"            # 2.4.2.1
     "/etc/passwd:f:root:root:0644"               # 7.1.1
