@@ -53,7 +53,7 @@ check_distro() {
     # Older Debian/Ubuntu/etc.
     DISTRO=Debian
     VER=$(cat /etc/debian_version)
-  elif command -v uname; then
+  elif command -v uname &>/dev/null; then
     # Fall back to uname
     DISTRO=$(uname -s)
     VER=$(uname -r)

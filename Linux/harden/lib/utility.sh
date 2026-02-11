@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# TODO: Do not perform backup if directory is bigger than threshold set
+# (Default is 500, a command line option should be added to tweak this)
+
 # Basic tar backup function for /etc, /var/www/html, and /opt 
 # to directory specified with -b, defaults to /usr/sbin if unspecified
 # Will put your backups into the child directory specified with -B,
@@ -40,17 +43,43 @@ backup_directories() {
         "Performing backup on" "$directory"
       backup_name="${backup_path}${directories[$directory]}$(date +%b-%d-%H.%M.%S)"
       if [[ "$ARG_COMPRESS" == "disabled" ]]; then
-        tar -cf "${backup_name}.tar" "${directory}" &> /dev/null || true
+        tar -cf "${backup_name}.tar" "${directory}" &>/dev/null || true
         extension=".tar"
       else
-        tar -czf "${backup_name}.tgz" "${directory}" &> /dev/null || true
+        tar -czf "${backup_name}.tgz" "${directory}" &>/dev/null || true
         extension=".tgz"
       fi
       for flag in u a i; do
-        chattr +"$flag" "${backup_name}${extension}" &> /dev/null || true
+        chattr +"$flag" "${backup_name}${extension}" &>/dev/null || true
       done
     fi
   done
 
   print_status message_object success directory "Completed backups to" "$backup_path"
+}
+
+# Not using this since its less "proper" to pipe ps to grep,
+# but if for some reason the other breaks, this should still be functional
+# ps -eaf --forest | \
+#   grep -vE "([0-9]([[:blank:]]|\|)*\\\_[[:blank:]]\[.*\]|\[kthreadd\])$" | \
+#   less -S
+pscf() {
+  ps -fp $(pgrep -P2 -v -d,) --forest | \
+    sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
+    grep -v "ps -p [0-9]*" | \
+    less -S
+}
+
+# Should provide a "simplified" output, searching for "suspicious" processes
+pscs() {
+  ps -p $(pgrep -P2 -v -d,) -o euser,pid,ppid,tty,args | \
+    sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
+    grep -v "ps -p [0-9]*" | \
+    grep -E "bash|sh|rbash|python|php|ssh|httpd|apache|nginx" | \
+    less -S
+}
+
+# Just excludes loopback addresses
+ssc() {
+  ss -tulpn | grep -v -e "127.0.0.1" -e "\[\:\:1\]" | less -S
 }

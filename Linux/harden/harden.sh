@@ -346,6 +346,8 @@ fi
 . ./lib/not-yet-implemented.sh
 
 # Print the options available
+# TODO: Have this function iterate over a list to make adding/removing
+# options far more simple
 print_main_menu() {
   printf "%b%s%b\n" "${GREEN}${BOLD}" "Welcome to harden.sh" "${NC}"
   printf "%b%s%b\n" "${GREEN}" \
@@ -361,6 +363,12 @@ print_main_menu() {
     "Show initial information gathered at beginning of the script"
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "p | pms" "${NC}" \
     "Not Yet Implemented: Poor Man's SIEM"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "f | pscf" "${NC}" \
+    "Enter a bash login shell within the script"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "S | pscs" "${NC}" \
+    "Enter a bash login shell within the script"
+  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "s | ssc" "${NC}" \
+    "Enter a bash login shell within the script"
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "B | bash" "${NC}" \
     "Enter a bash login shell within the script"
   printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "q | quit" \
@@ -436,6 +444,15 @@ main() {
           backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
             || print_status unsuccessful_function error \
               "backup_directories"
+          ;;
+        pscf | f)
+          pscf || print_status unsuccessful_function error "pscf"
+          ;;
+        pscs | S)
+          pscs || print_status unsuccessful_function error "pscs"
+          ;;
+        ssc | s)
+          ssc || print_status unsuccessful_function error "ssc"
           ;;
         upgrade | up)
           upgrade_system "$PKG_MANAGER" \
