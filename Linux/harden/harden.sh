@@ -32,7 +32,6 @@ if [[ "$SCRIPT_VERSION" == "unknown-build" ]] && command -v git describe &>/dev/
   SCRIPT_VERSION=$(git describe --tags --always --dirty)
 fi
 
-
 # Set ANSI Escape Code variables for different colors in the terminal
 readonly RED='\033[0;31m'      # For ERROR or Firewalls
 readonly GREEN='\033[0;32m'    # For SUCCESS
@@ -350,6 +349,24 @@ fi
 . ./lib/packages.sh
 . ./lib/permissions.sh
 . ./lib/not-yet-implemented.sh
+
+declare -ar SECTIONS=(
+  "Tools:Useful for operation of the script"
+  "Packages:Automated upgrades, removals, and installations"
+  "Quick:Run instantly + don't require package installs (usually)"
+  "Heavy:May require package installs"
+)
+
+declare -Ar OPTIONS_TOOLS=(
+  ["backup:b"]="Will backup \"important directories\""
+  ["init:i"]="Show initial information gathered at beginning of the script"
+  ["pms:p"]="Not Yet Implemented: Poor Man's SIEM"
+  ["pscf:f"]="ps command, with detailed output"
+  ["pscs:S"]="ps command, with simplified output"
+  ["ssc:s"]="ss command, excluding localhost"
+  ["bash:B"]="Enter a bash login shell within the script"
+  ["quit:q"]="Exit program"
+)
 
 # Print the options available
 # TODO: Have this function iterate over a list to make adding/removing

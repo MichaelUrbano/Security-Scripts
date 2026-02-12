@@ -166,6 +166,19 @@ configure_firewall() {
     ["wazuh-api:55000/tcp"]="ALLOW"
     ["splunk-agent:9997/tcp"]="DROP"
   )
+  # workaround to print out outbound_rulelist in a given order
+  local -ar outbound_rulelist_order=(
+    "http:80/tcp"
+    "https:443/tcp"
+    "dns:53/udp"
+    "dns-xfr:53/tcp"
+    "dhcp-client:68/udp"
+    "ntp:123/udp"
+    "wazuh-agent:1514/tcp"
+    "wazuh-enroll:1515/tcp"
+    "wazuh-api:55000/tcp"
+    "splunk-agent:9997/tcp"
+  )
   local -ar service_ports=(
     ftp-data:20/tcp
     ftp:21/tcp
@@ -366,12 +379,12 @@ configure_firewall() {
   }
 
   fw_show_outbound() {
-    for outbound_service in "${!outbound_rulelist[@]}"; do
+    for outbound_service in "${outbound_rulelist_order[@]}"; do
       if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
-        printf "%-20s : %b%7s%b\n" \
+        printf "%-25s : %b%7s%b\n" \
           "$outbound_service" "${GREEN}${BOLD}" "ALLOW" "$NC"
       else
-        printf "%-20s : %b%7s%b\n" \
+        printf "%-25s : %b%7s%b\n" \
           "$outbound_service" "${RED}${BOLD}" "DROP" "$NC"
       fi
     done
