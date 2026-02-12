@@ -83,3 +83,10 @@ pscs() {
 ssc() {
   ss -tulpn | grep -v -e "127.0.0.1" -e "\[\:\:1\]" | less -S
 }
+
+# Internal helper scripts
+comm_exists() {
+  command="$1"
+  command -v "$command" &>/dev/null
+  return $?
+}

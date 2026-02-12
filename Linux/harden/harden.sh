@@ -9,6 +9,7 @@
 set -euo pipefail
 set +H
 
+# TODO: Assign script version automatically
 SCRIPT_VERSION="BUILD-UNKNOWN"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
