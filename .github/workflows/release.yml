@@ -1,4 +1,4 @@
-name: Package and Release harden-comp
+name: Package and Release Security Scripts
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
       - name: Create tar.xz archive
         run: |
           mkdir -p dist
-          chmod +x Linux/harden/harden.sh
+          sed -iE 's/SCRIPT_VERSION="unknown-build"/SCRIPT_VERSION=${{ github.ref_name }}/' Linux/harden/harden.sh
           tar -cJf "dist/harden.tar.xz" -C Linux harden
 
       - name: Create GitHub Release

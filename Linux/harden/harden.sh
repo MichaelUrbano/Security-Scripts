@@ -10,7 +10,7 @@ set -euo pipefail
 set +H
 
 # TODO: Assign script version automatically
-SCRIPT_VERSION="BUILD-UNKNOWN"
+SCRIPT_VERSION="unknown-build"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
 ARG_DISTRO=""
@@ -27,6 +27,11 @@ ARG_COMPRESS="enabled"
 SKIP_MAIN="false"
 # Set to "true" if you don't want to check for PUPs
 SKIP_PKG_CHK="false"
+
+if [[ "$SCRIPT_VERSION" == "unknown-build" ]] && command -v git describe &>/dev/null; then
+  SCRIPT_VERSION=$(git describe --tags --always --dirty)
+fi
+
 
 # Set ANSI Escape Code variables for different colors in the terminal
 readonly RED='\033[0;31m'      # For ERROR or Firewalls
