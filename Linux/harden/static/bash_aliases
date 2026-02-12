@@ -1,0 +1,29 @@
+# shellcheck disable=SC2148
+# Optional, QoL bash aliases
+# Can be placed into ~/.bashrc.d/bash_aliases or ~/.bash_aliases
+# Distribution dependent
+
+# General purpose aliases
+alias l='ls -alhF --color=auto'
+alias v='vim'
+alias n='nvim'
+alias si='sudo -i'
+
+# Quick alias for updates/upgrades on Debian/RHEL systems
+alias update='sudo apt update && sudo apt upgrade && [ -f /var/run/reboot-required ] && echo "Reboot required"'
+alias upgrade='sudo dnf upgrade && needs-restarting -r'
+
+# Docker Compose aliases (assumes user is in docker group/root)
+alias dc='docker compose'
+alias up='docker compose up -d'
+alias down='docker compose down'
+alias du='docker compose down && docker compose up -d'
+alias dor='docker compose restart'
+alias pup='docker compose pull && docker compose up -d && docker image prune -f'
+alias bup='docker compose build --no-cache && docker compose up -d --force-recreate && docker image prune -f'
+
+# Quick aliases to move to specific directories, with examples below
+alias cdo='cd /opt/docker'
+alias csp='cd /opt/splunk'
+alias cmc='cd /opt/minecraft'
+alias clo='cd /var/log'
