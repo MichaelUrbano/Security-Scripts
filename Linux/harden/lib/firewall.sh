@@ -167,6 +167,7 @@ configure_firewall() {
     ["splunk-agent:9997/tcp"]="DROP"
   )
   # workaround to print out outbound_rulelist in a given order
+  # it should be replaced with the PRINT_ORDER solution used for the main menu
   local -ar outbound_rulelist_order=(
     "http:80/tcp"
     "https:443/tcp"

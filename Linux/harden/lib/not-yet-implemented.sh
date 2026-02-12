@@ -36,6 +36,9 @@
 
 # TODO: automated download of Wazuh deb/rpm
 
+# TODO: use shell parameter expansions instead of cut/awk where possible
+# (hacksaw operators)
+
 configure_sudo() {
   return 1
 }

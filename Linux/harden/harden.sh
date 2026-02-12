@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck source=/dev/null
+# shellcheck disable=SC2034
 
 # Want to get close to Google's styleguide?
 # Run shfmt -i 2 -ci -bn
@@ -70,6 +71,7 @@ readonly REGEX_RPM_DISTROS='^(centos|rocky|almalinux|ol|fedora|rhel)$'
 
 # For testing purposes, will execute before init() within main()
 do_before() {
+  print_menu_options
   return 0
 }
 
@@ -350,96 +352,130 @@ fi
 . ./lib/permissions.sh
 . ./lib/not-yet-implemented.sh
 
+
+# This requires some explaining:
+# the SECTIONS indexed array determines the order which
+# particular sections are printed.
+# From there, it can then understand to visit the asociative array,
+# SECTIONS_${SECTION}
+# from there it will print the values of NAME and DESCRIPTION within that array
+# it will then look at PRINT_ORDER, separated by colons, to determine in what
+# order it should print out the options. Once it encounters an empty field
+# (usually at the end, like with quit:), then it will finish printing.
 declare -ar SECTIONS=(
-  "Tools:Useful for operation of the script"
-  "Packages:Automated upgrades, removals, and installations"
-  "Quick:Run instantly + don't require package installs (usually)"
-  "Heavy:May require package installs"
+  "TOOLS"
+  "PACKAGES"
+  "QUICK"
+  "HEAVY"
 )
 
-declare -Ar OPTIONS_TOOLS=(
-  ["backup:b"]="Will backup \"important directories\""
-  ["init:i"]="Show initial information gathered at beginning of the script"
-  ["pms:p"]="Not Yet Implemented: Poor Man's SIEM"
-  ["pscf:f"]="ps command, with detailed output"
-  ["pscs:S"]="ps command, with simplified output"
-  ["ssc:s"]="ss command, excluding localhost"
-  ["bash:B"]="Enter a bash login shell within the script"
-  ["quit:q"]="Exit program"
+# Contain the NAME of the section, a DESCRIPTION of it,
+# The PRINT_ORDER of what commands come first or last,
+# META information on what these sections are being used for,
+# then the actual keys are the names of the commands,
+# and the values are comma separated, with the short command on the left of
+# the colon, and the description on the right of the colon.
+declare -Ar SECTIONS_TOOLS=(
+  ["NAME"]="Tools"
+  ["DESCRIPTION"]="Useful for operation of the script"
+  ["PRINT_ORDER"]="backup:init:pms:pscf:pscs:ssc:bash:quit:"
+  ["META"]="main_menu"
+  ["backup"]="b:Will backup \"important directories\""
+  ["init"]="i:Show initial information gathered at beginning of the script"
+  ["pms"]="p:Not Yet Implemented: Poor Man's SIEM"
+  ["pscf"]="f:ps command, with detailed output"
+  ["pscs"]="S:ps command, with simplified output"
+  ["ssc"]="s:ss command, excluding localhost"
+  ["bash"]="B:Enter a bash login shell within the script"
+  ["quit"]="q:Exit program"
 )
 
-# Print the options available
-# TODO: Have this function iterate over a list to make adding/removing
-# options far more simple
+declare -Ar SECTIONS_PACKAGES=(
+  ["NAME"]="Packages"
+  ["DESCRIPTION"]="Automated upgrades, removals, and installations"
+  ["PRINT_ORDER"]="upgrade:remove:install:download:"
+  ["META"]="main_menu"
+  ["upgrade"]="up:Upgrades the system"
+  ["remove"]="rm:Asks to remove potentially unwanted packages"
+  ["install"]="in:Asks to install potentially helpful packages"
+  ["download"]="dl:Asks to download third-party software"
+)
+
+declare -Ar SECTIONS_QUICK=(
+  ["NAME"]="Quick"
+  ["DESCRIPTION"]="Run instantly + don't require package installs (usually)"
+  ["PRINT_ORDER"]="grub:perms:parts:mods:sys:mac:"
+  ["META"]="main_menu"
+  ["grub"]=":Configures bootloader parameters"
+  ["perms"]=":Reconfigures permissions for files and directories"
+  ["parts"]=":Sets secure mount options for partitions"
+  ["mods"]=":Disables unused kernel modules"
+  ["sys"]=":Reconfigures kernel parameters"
+  ["mac"]=":Sets up AppArmor/SELinux"
+)
+
+declare -Ar SECTIONS_HEAVY=(
+  ["NAME"]="Heavy"
+  ["DESCRIPTION"]="May require package installs"
+  ["PRINT_ORDER"]="fwinit:fwconf:logging:audit:aide:"
+  ["META"]="main_menu"
+  ["fwinit"]="fwi:Initializes the firewall on the system"
+  ["fwconf"]="fwc:Helps you configure in/out firewall rules"
+  ["logging"]="log:Initializes and configures journald or rsyslog"
+  ["audit"]="aud:Initializes auditd configuration and rules"
+  ["aide"]="aid:Initializes AIDE (may take awhile)"
+)
+
+# TODO: Make this function more detached from the main menu
+
+# Dynamically print out menu options
+print_menu_options() {
+  local section current_option short_option description_option
+  local -i val=1
+
+  for section in "${SECTIONS[@]}"; do
+    # Makes us compatible up to bash 4.3, so it may require some compatibility
+    # workarounds on older distributions. No namerefs before 4.3
+    local -n current_section="SECTIONS_$section"
+    printf "\n%b%-17s%b:\t%s\n" \
+      "${GREEN}${BOLD}" "${current_section[NAME]}" "${GREEN}" \
+      "${current_section[DESCRIPTION]}"
+
+    # current_option is the name of the long option
+    current_option="${current_section[PRINT_ORDER]%%:*}"
+
+    while [[ "$current_option" != "" ]]; do
+      short_option=$(echo "${current_section[${current_option}]}" | \
+        cut -d ":" -f 1)
+      if [[ -z "${current_section[${current_option}]%%:*}" ]]; then
+        short_option=""
+      else
+        short_option="${current_section[${current_option}]%%:*} | "
+      fi
+      description_option="${current_section[${current_option}]##*:}"
+      printf "%b%-17s%b:\t%s\n" \
+        "${YELLOW}${BOLD}" "${short_option}${current_option}" "${NC}" \
+        "${description_option}"
+      val=$val+1
+      current_option=$(echo "${current_section[PRINT_ORDER]}" | cut -d ":" -f $val)
+    done
+
+    val=1
+  done
+}
+
+# Print the main menu
 print_main_menu() {
   printf "%b%s%b\n" "${GREEN}${BOLD}" "Welcome to harden.sh" "${NC}"
   printf "%b%s%b\n" "${GREEN}" \
     "Options are organized into the sections Tools, Packages, Quick, and Heavy" \
     "${NC}"
   printf "%b%s%b\n" "$GREEN" "Enter the name of an option below:" "$NC"
-
-  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Tools" "${GREEN}" \
-    "Useful for operation of the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "b | backup" "${NC}" \
-    "Will backup \"important directories\""
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "i | init" "${NC}" \
-    "Show initial information gathered at beginning of the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "p | pms" "${NC}" \
-    "Not Yet Implemented: Poor Man's SIEM"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "f | pscf" "${NC}" \
-    "Enter a bash login shell within the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "S | pscs" "${NC}" \
-    "Enter a bash login shell within the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "s | ssc" "${NC}" \
-    "Enter a bash login shell within the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "B | bash" "${NC}" \
-    "Enter a bash login shell within the script"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "q | quit" \
-    "${NC}" "Exit program"
-
-  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Packages" "${GREEN}" \
-    "Automated upgrades, removals, and installations"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "up | upgrade" "${NC}" \
-    "Upgrades the system"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "rm | remove" "${NC}" \
-    "Asks to remove potentially unwanted packages"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "in | install" "${NC}" \
-    "Asks to install potentially helpful packages"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "dl | download" "${NC}" \
-    "Asks to download potentially helpful software"
-
-  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Quick" "${GREEN}" \
-    "Run instantly + don't require package installs (usually)"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "grub" "${NC}" \
-    "Configures bootloader parameters"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "perms" "${NC}" \
-    "Reconfigures permissions for files and directories"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "parts" "${NC}" \
-    "Sets secure mount options for partitions"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "mods" "${NC}" \
-    "Disables unused kernel modules"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "sys" "${NC}" \
-    "Reconfigures kernel parameters"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "mac" "${NC}" \
-    "Sets up AppArmor/SELinux"
-
-  printf "\n%b%-17s%b:\t%s\n" "${GREEN}${BOLD}" "Heavy" "${GREEN}" \
-    "May require package installs"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "fwi | fwinit" "${NC}" \
-    "Initializes the firewall on the system"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "fwc | fwconf" "${NC}" \
-    "Helps you configure in/out firewall rules"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "log | logging" "${NC}" \
-    "Initializes and configures journald or rsyslog"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "aud | audit" "${NC}" \
-    "Initializes auditd configuration and rules"
-  printf "%b%-17s%b:\t%s\n" "${YELLOW}${BOLD}" "aid | aide" "${NC}" \
-    "Initializes AIDE (may take awhile)"
-
+  print_menu_options
   printf "\n"
 }
 
-# Will present the main menu
+# Creates the interactable main menu, and also performs setup tasks
 main() {
   do_before
   init
