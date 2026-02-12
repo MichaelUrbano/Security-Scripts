@@ -22,11 +22,7 @@ ARG_CLEAR="enabled"
 ARG_QUICK="disabled"
 ARG_BACKUP="disabled"
 ARG_COMPRESS="enabled"
-
-# Set to "true" if you want to ignore the main menu,
-# possibly to run functions directly
 SKIP_MAIN="false"
-# Set to "true" if you don't want to check for PUPs
 SKIP_PKG_CHK="false"
 
 if [[ "$SCRIPT_VERSION" == "unknown-build" ]] && command -v git describe &>/dev/null; then
@@ -255,16 +251,16 @@ EOF
       shift
       ;;
     -d | --distro)
-      ARG_DISTRO="$2"
-      shift 2
+      ARG_DISTRO="${2:-unknown}"
+      shift 2 || printf "Error: DIST cannot be empty\n"; exit 1
       ;;
     -e | --no-errfail)
       set +e
       shift
       ;;
     -f | --firewall)
-      ARG_FW="$2"
-      shift 2
+      ARG_FW="${2:-unknown}"
+      shift 2 || printf "Error: FW cannot be empty\n"; exit 1
       ;;
     -i | --init)
       check_root
@@ -274,8 +270,8 @@ EOF
       exit 0
       ;;
     -p | --pkg-manager)
-      ARG_PM="$2"
-      shift 2
+      ARG_PM="${2:-unknown}"
+      shift 2 || printf "Error: PM cannot be empty\n"; exit 1
       ;;
     -P | --skip-pkg-chk)
       SKIP_PKG_CHK="true"
@@ -294,8 +290,8 @@ EOF
       shift
       ;;
     -V | --distro-version)
-      ARG_VER="$2"
-      shift 2
+      ARG_VER="${2:-unknown}"
+      shift 2 || printf "Error: VER cannot be empty\n"; exit 1
       ;;
     -x | --xtrace)
       set -x
