@@ -169,16 +169,16 @@ configure_firewall() {
   # workaround to print out outbound_rulelist in a given order
   # it should be replaced with the PRINT_ORDER solution used for the main menu
   local -ar outbound_rulelist_order=(
-    "http:80/tcp"
-    "https:443/tcp"
-    "dns:53/udp"
-    "dns-xfr:53/tcp"
-    "dhcp-client:68/udp"
-    "ntp:123/udp"
-    "wazuh-agent:1514/tcp"
-    "wazuh-enroll:1515/tcp"
-    "wazuh-api:55000/tcp"
-    "splunk-agent:9997/tcp"
+    http:80/tcp
+    https:443/tcp
+    dns:53/udp
+    dns-xfr:53/tcp
+    dhcp-client:68/udp
+    ntp:123/udp
+    wazuh-agent:1514/tcp
+    wazuh-enroll:1515/tcp
+    wazuh-api:55000/tcp
+    splunk-agent:9997/tcp
   )
   local -ar service_ports=(
     ftp-data:20/tcp
@@ -663,15 +663,7 @@ configure_firewall() {
   }
 
   fw_help() {
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "a | append" "Allows you to append allow inbound rules to rulelist"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "t | toggle" "Allows you to toggle allow outbound rules on rulelist"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "d | delete" "Will let you delete a specific inbound rule on rulelist"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "r | reset" "Will delete all of your rules on rulelist"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "s | show" "Will show your rulelist"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "l | list" "Will list available service names"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "f | finalize" "Will implement your rulelist onto the permanent firewall configuration"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "h | help" "Will show you this prompt again"
-    printf "${YELLOW}${BOLD}%-15s${NC} :\t %s\n" "q | quit" "Will quit to main menu, without saving any changes"
+    generate_menu_options fw help
     printf "\n"
     printf "Before rules are applied to the real firewall configuration,\n"
     printf \
