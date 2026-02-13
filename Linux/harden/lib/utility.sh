@@ -63,6 +63,8 @@ backup_directories() {
 # ps -eaf --forest | \
 #   grep -vE "([0-9]([[:blank:]]|\|)*\\\_[[:blank:]]\[.*\]|\[kthreadd\])$" | \
 #   less -S
+
+# ps command with detailed output
 pscf() {
   ps -fp $(pgrep -P2 -v -d,) --forest | \
     sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
@@ -70,7 +72,8 @@ pscf() {
     less -S
 }
 
-# Should provide a "simplified" output, searching for "suspicious" processes
+
+# ps command with simplified output to quickly find "suspicious" processes
 pscs() {
   ps -p $(pgrep -P2 -v -d,) -o euser,pid,ppid,tty,args | \
     sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
@@ -79,12 +82,14 @@ pscs() {
     less -S
 }
 
-# Just excludes loopback addresses
+# ss command that excludes loopback addresses
 ssc() {
   ss -tulpn | grep -v -e "127.0.0.1" -e "\[\:\:1\]" | less -S
 }
 
-# Internal helper scripts
+# Internal helper functions
+
+# Checks if a command exists on the system
 comm_exists() {
   command="$1"
   command -v "$command" &>/dev/null

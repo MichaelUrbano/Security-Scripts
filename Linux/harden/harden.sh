@@ -44,7 +44,7 @@ readonly IC="${BLUE}${BOLD}"   # [INFO]
 readonly SC="${GREEN}${BOLD}"  # [SUCCESS]
 readonly UC="\033[1;4;43;31m"  # [UNKNOWN]
 
-# List of Linux Distributions supported by the script
+# List of Linux Distributions IDs supported by the script
 declare -ar SUPPORTED_DISTROS=(
   "ubuntu"
   "debian"
@@ -122,6 +122,7 @@ override() {
 }
 
 # Check for OPTIONS passed
+# TODO: Replace this with getopts, as well as use compgen, compopt, and complete
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)

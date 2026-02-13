@@ -53,7 +53,7 @@ check_distro() {
     # Older Debian/Ubuntu/etc.
     DISTRO=Debian
     VER=$(cat /etc/debian_version)
-  elif command -v uname &>/dev/null; then
+  elif comm_exists uname; then
     # Fall back to uname
     DISTRO=$(uname -s)
     VER=$(uname -r)
@@ -106,7 +106,7 @@ init() {
   # Choose correct package manager for distro
   case "$DISTRO" in
     ubuntu | debian)
-      if command -v apt &>/dev/null; then
+      if comm_exists apt; then
         PKG_MANAGER="apt"
       else
         print_status message alert "Using dpkg instead of apt"
@@ -114,9 +114,9 @@ init() {
       fi
       ;;
     centos | rocky | almalinux | fedora | rhel | ol)
-      if command -v dnf &>/dev/null; then
+      if comm_exists dnf; then
         PKG_MANAGER="dnf"
-      elif command -v yum &>/dev/null; then
+      elif comm_exists yum; then
         PKG_MANAGER="yum"
       else
         print_status message alert "Using rpm instead of dnf or yum"
@@ -139,22 +139,22 @@ init() {
   FIREWALLS=()
 
   # firewalld
-  if command -v firewall-cmd &>/dev/null; then
+  if comm_exists firewall-cmd; then
     FIREWALLS+=("firewalld")
   fi
 
   # ufw
-  if command -v ufw &>/dev/null; then
+  if comm_exists ufw; then
     FIREWALLS+=("ufw")
   fi
 
   # nftables
-  if command -v nft &>/dev/null; then
+  if comm_exists nft; then
     FIREWALLS+=("nftables")
   fi
 
   # iptables
-  if command -v iptables &>/dev/null; then
+  if comm_exists iptables; then
     FIREWALLS+=("iptables")
   fi
 
@@ -272,7 +272,7 @@ init() {
 
   # TODO(michael): Add check for su
   print_status message info "Checking sudo configuration" "(/etc/sudoers)"
-  if ! command -v sudo &>/dev/null; then
+  if ! comm_exists sudo; then
     print_status not_installed alert "sudo"
   else
     if ! grep -qrPi '^\h*Defaults\h+([^#\n\r]+,\h*)?use_pty\b' /etc/sudoers*; then

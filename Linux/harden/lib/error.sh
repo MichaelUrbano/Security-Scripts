@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# TODO: Add prst_message_multiobject function which can use multiple colors
+
+# The format for print_status shares the same syntax for the first 3 arguments:
+# print_status [MESSAGE_TYPE] [STATUS]
+# With MESSAGE_TYPE being the specific message function to use;
+# With STATUS being error, warn, info, success, or alert
+
 # The following status messages are available
 # print_status message status "text"
 # print_status message_object status object "text" "object"
@@ -20,6 +27,8 @@
 print_status() {
   local name="$1"
   shift
+  # Not resetting the color here is intentional,
+  # it makes it easier to see faulty error messages
   "prst_${name}" "$@" || printf "%b%s%b\n" "$UC" "Unknown Error" "$UC"
 }
 

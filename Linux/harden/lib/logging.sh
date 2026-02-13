@@ -2,7 +2,7 @@
 
 # CIS 6.2.3 (Ubuntu), 6.3.3 (RHEL)
 configure_auditd() {
-  if ! command -v auditctl &> /dev/null; then
+  if ! comm_exists auditctl; then
     print_status message error "Please ensure auditd is installed"
     return 1
   fi
@@ -252,7 +252,7 @@ EOF
 
 # CIS Ubuntu 6.1.1-2, RHEL 6.2.1-2
 configure_logging() {
-  if ! command -v journalctl &> /dev/null; then
+  if ! comm_exists journalctl; then
     print_status message error "Please ensure systemd-journald is installed"
     return 1
   fi
@@ -373,7 +373,7 @@ EOF
 }
 
 configure_aide() {
-  command -v aide &>/dev/null || {
+  comm_exists aide || {
     print_status message error "Please ensure AIDE is installed."
     return 1
   }

@@ -12,7 +12,7 @@ disable_kernel_modules() {
 #    "afs" "ceph" "cifs" "exfat" "ext" "fat" "fscache" "fuse" "gfs2"
 #    "nfs_common" "nfsd" "smbfs_common"
 #  )
-  if [[ "$DISTRO" != "ubuntu" ]] && ! command -v snap &> /dev/null; then
+  if [[ "$DISTRO" != "ubuntu" ]] && ! comm_exists snap; then
     modules+=("squashfs")
   fi
   local hardening_blacklist="/etc/modprobe.d/hardening-blacklist.conf"
@@ -96,7 +96,7 @@ configure_sysctl() {
 
 # Will change boot parameters and ensure MAC is enforced
 configure_grub() {
-  if command -v grubby; then
+  if comm_exists grubby; then
     grubby --update-kernel ALL --remove-args "selinux=0 enforcing=0"
     grubby --update-kernel="$(grubby --default-kernel)" \
       --args="apparmor=1 security=apparmor audit=1 audit_backlog_limit=8192"
@@ -130,9 +130,9 @@ configure_grub() {
     sed -i 's/\bselinux=0\b//g; s/\benforcing=0\b//g' /etc/default/grub
   fi
 
-  if command -v update-grub; then
+  if comm_exists update-grub; then
     update-grub
-  elif command -v grub2-mkconfig && [[ -f /boot/grub2/grub.cfg ]]; then
+  elif comm_exists grub2-mkconfig && [[ -f /boot/grub2/grub.cfg ]]; then
     grub2-mkconfig -o /boot/grub2/grub.cfg
   else
     print_status message error "Please manually run update-grub"
@@ -145,7 +145,7 @@ configure_grub() {
 configure_mac() {
   case "$DISTRO" in
     ubuntu | debian | sles | opensuse* | suse)
-      if ! command -v aa-enforce &> /dev/null; then
+      if ! comm_exists aa-enforce; then
         print_status message_object error command \
           "Could not run" "aa-enforce"
         return 1

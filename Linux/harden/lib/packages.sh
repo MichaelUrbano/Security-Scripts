@@ -291,13 +291,13 @@ install_recommended_packages() {
 }
 
 download_software() {
-  if command -v wget &> /dev/null; then
+  if comm_exists wget; then
     wget -qO ./bin/linpeas.sh \
       "https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh"
     wget -qO ./bin/maldetect-current.tar.gz \
       "https://www.rfxn.com/downloads/maldetect-current.tar.gz"
     print_status message_object success command "Downloaded files with" "wget"
-  elif command -v curl &> /dev/null; then
+  elif comm_exists curl; then
     curl -sOJ \
       https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh \
       --output-dir ./bin
