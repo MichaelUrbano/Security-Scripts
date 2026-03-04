@@ -26,6 +26,12 @@ jobs:
       options: --privileged --cap-add=NET_ADMIN
 
     steps:
+      - name: Install tar for checkout
+        if: contains(matrix.distro, 'opensuse') || contains(matrix.distro, 'oraclelinux') || contains(matrix.distro, 'fedora')
+        run: |
+          if command -v zypper >/dev/null; then zypper refresh && zypper install -y tar gzip; fi
+          if command -v dnf >/dev/null; then dnf install -y tar gzip; fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -40,13 +46,13 @@ jobs:
         run: |
           dnf install -y epel-release || true
           dnf update -y
-          dnf install -y bats expect sudo iptables iproute2 net-tools
+          dnf install -y bats expect sudo iptables iproute2 iproute net-tools tar gzip --allowerasing || dnf install -y bats expect sudo iptables iproute net-tools tar gzip
 
       - name: Install dependencies (OpenSUSE)
         if: contains(matrix.distro, 'opensuse')
         run: |
           zypper refresh
-          zypper install -y bats expect sudo iptables iproute2 net-tools
+          zypper install -y bats expect sudo iptables iproute2 net-tools tar gzip
 
       - name: Run BATS tests
         run: |
