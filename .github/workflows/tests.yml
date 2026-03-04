@@ -29,8 +29,8 @@ jobs:
       - name: Install tar for checkout
         if: contains(matrix.distro, 'opensuse') || contains(matrix.distro, 'oraclelinux') || contains(matrix.distro, 'fedora')
         run: |
-          if command -v zypper >/dev/null; then zypper refresh && zypper install -y tar gzip; fi
-          if command -v dnf >/dev/null; then dnf install -y tar gzip; fi
+          if command -v zypper >/dev/null; then zypper refresh && zypper install -y tar gzip sudo; fi
+          if command -v dnf >/dev/null; then dnf install -y tar gzip sudo; fi
 
       - name: Checkout repository
         uses: actions/checkout@v4

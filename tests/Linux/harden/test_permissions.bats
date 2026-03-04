@@ -15,7 +15,7 @@ setup() {
     # Run harden.sh skipping everything but 'perms' in TUI
     cd "$HARDEN_DIR"
     run expect -c "
-        spawn ./harden.sh -c
+        spawn sudo ./harden.sh -c
         expect \"harden> \"
         send \"perms\\r\"
         expect \"Configured permissions\"
@@ -40,7 +40,7 @@ setup() {
     # Run harden.sh skipping everything but 'perms' in TUI
     cd "$HARDEN_DIR"
     run expect -c "
-        spawn ./harden.sh -c
+        spawn sudo ./harden.sh -c
         expect \"harden> \"
         send \"perms\\r\"
         expect \"Configured permissions\"
