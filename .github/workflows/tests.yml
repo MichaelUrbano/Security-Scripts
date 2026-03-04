@@ -1,0 +1,55 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    name: Run BATS tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - 'debian:latest'
+          - 'ubuntu:latest'
+          - 'oraclelinux:9'
+          - 'fedora:latest'
+          - 'opensuse/leap:latest'
+    container:
+      image: ${{ matrix.distro }}
+      options: --privileged --cap-add=NET_ADMIN
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Debian/Ubuntu)
+        if: contains(matrix.distro, 'debian') || contains(matrix.distro, 'ubuntu')
+        run: |
+          apt-get update
+          apt-get install -y bats expect sudo iptables iproute2 net-tools
+
+      - name: Install dependencies (Oracle/Fedora)
+        if: contains(matrix.distro, 'oraclelinux') || contains(matrix.distro, 'fedora')
+        run: |
+          dnf install -y epel-release || true
+          dnf update -y
+          dnf install -y bats expect sudo iptables iproute2 net-tools
+
+      - name: Install dependencies (OpenSUSE)
+        if: contains(matrix.distro, 'opensuse')
+        run: |
+          zypper refresh
+          zypper install -y bats expect sudo iptables iproute2 net-tools
+
+      - name: Run BATS tests
+        run: |
+          cd tests/Linux/harden
+          bats test_tui.bats
+          bats test_permissions.bats
