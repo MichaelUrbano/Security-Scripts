@@ -66,20 +66,32 @@ backup_directories() {
 
 # ps command with detailed output
 pscf() {
-  ps -fp $(pgrep -P2 -v -d,) --forest | \
-    sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
-    grep -v "ps -p [0-9]*" | \
-    less -S
+  local pids
+  pids=$(pgrep -P2 -v -d,)
+  if [[ -n "$pids" ]]; then
+    ps -fp "$pids" --forest | \
+      sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
+      grep -v "ps -p [0-9]*" | \
+      less -S
+  else
+    print_status message info "No processes found"
+  fi
 }
 
 
 # ps command with simplified output to quickly find "suspicious" processes
 pscs() {
-  ps -p $(pgrep -P2 -v -d,) -o euser,pid,ppid,tty,args | \
-    sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
-    grep -v "ps -p [0-9]*" | \
-    grep -E "bash|sh|rbash|python|php|ssh|httpd|apache|nginx" | \
-    less -S
+  local pids
+  pids=$(pgrep -P2 -v -d,)
+  if [[ -n "$pids" ]]; then
+    ps -p "$pids" -o euser,pid,ppid,tty,args | \
+      sed -E "s|\/nix\/store\/.*\/|nixstor\:\/|g" | \
+      grep -v "ps -p [0-9]*" | \
+      grep -E "bash|sh|rbash|python|php|ssh|httpd|apache|nginx" | \
+      less -S
+  else
+    print_status message info "No processes found"
+  fi
 }
 
 # ss command that excludes loopback addresses
