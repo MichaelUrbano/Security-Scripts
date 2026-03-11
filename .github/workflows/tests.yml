@@ -18,7 +18,7 @@ jobs:
         distro:
           - 'debian:latest'
           - 'ubuntu:latest'
-          - 'oraclelinux:9'
+          - 'oraclelinux:10'
           - 'fedora:latest'
           - 'opensuse/leap:latest'
     container:
@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies (Oracle/Fedora)
         if: contains(matrix.distro, 'oraclelinux') || contains(matrix.distro, 'fedora')
         run: |
-          dnf install -y epel-release || true
+          dnf install -y oracle-epel-release-el10 || true
           dnf update -y
           dnf install -y bats expect sudo iptables iproute2 iproute net-tools tar gzip --allowerasing || dnf install -y bats expect sudo iptables iproute net-tools tar gzip
 

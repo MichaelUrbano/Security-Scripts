@@ -1,0 +1,79 @@
+# For automated local tests, this builds Dockerfiles, and runs bats tests as defined in the environment variable TESTS, defined in .env
+services:
+  debian:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/debian.Dockerfile
+    container_name: security-scripts-testing-debian-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"
+
+  ubuntu:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/ubuntu.Dockerfile
+    container_name: security-scripts-testing-ubuntu-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"
+
+  oraclelinux-9:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-9.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-9
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"
+
+  oraclelinux-10:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-10.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-10
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"
+
+  fedora:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/fedora.Dockerfile
+    container_name: security-scripts-testing-fedora-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"
+
+  opensuse-leap:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/opensuse-leap.Dockerfile
+    container_name: security-scripts-testing-opensuse-leap-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "${TESTS}"

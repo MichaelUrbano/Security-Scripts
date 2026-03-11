@@ -1,0 +1,85 @@
+# For manual local tests, this builds Dockerfiles, but does not run any bats tests, allowing for you to run
+# docker exec -it security-scripts-testing-<name>-<version> /bin/bash
+services:
+  # Can name whatever you like, or you can use the naming scheme <distribution>-<version>
+  example:
+    build:
+      # Context should be root of repository so all files can be seen.
+      context: ../../../../../
+      # Replace with Dockerfile you want to build,
+      # see example.Dockerfile for general format required.
+      dockerfile: tests/Linux/harden/docker/Dockerfile/example.Dockerfile
+    # Can name whatever you like, or you can use the naming scheme security-scripts-testing-<distribution>-<version>
+    container_name: security-scripts-testing-example
+    # Must be privileged & have capabilities added to test certain features, like changing firewall configurations.
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    # Not strictly necessary, can remove these two lines if desired
+    stdin_open: true
+    tty: true
+  debian:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/debian.Dockerfile
+    container_name: security-scripts-testing-debian-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+
+  ubuntu:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/ubuntu.Dockerfile
+    container_name: security-scripts-testing-ubuntu-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+
+  oraclelinux-9:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-9.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-9
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+
+  oraclelinux-10:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-10.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-10
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+
+  fedora:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/fedora.Dockerfile
+    container_name: security-scripts-testing-fedora-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+
+  opensuse-leap:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/opensuse-leap.Dockerfile
+    container_name: security-scripts-testing-opensuse-leap-latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
