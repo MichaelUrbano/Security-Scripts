@@ -10,7 +10,6 @@
 set -euo pipefail
 set +H
 
-# TODO: Assign script version automatically
 SCRIPT_VERSION="unknown-build"
 ARG_DIRECTORY=""
 ARG_SUBDIRECTORY=""
@@ -121,12 +120,18 @@ override() {
   fi
 }
 
-# Check for OPTIONS passed
-# TODO: Replace this with getopts, as well as use compgen, compopt, and complete
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -h | --help)
-      cat << EOF
+print_version() {
+  cat << EOF
+harden.sh ${SCRIPT_VERSION} from Security Scripts
+Copyright (C) 2025 - 2026 Michael Urbano
+Licensed under the BSD 3-Clause License
+See: https://opensource.org/licenses/BSD-3-Clause
+
+EOF
+}
+
+print_help() {
+  cat << EOF
 Usage: sudo $0 [OPTIONS]...
 Hardening and utility script for competitions
 
@@ -203,17 +208,29 @@ For more information, please visit the GitHub page.
 <https://github.com/MichaelUrbano/Security-Scripts>.
 Report bugs and issues on the Issues page.
 Report vulnerabilities directly to git@michaelurbano.com
+
 EOF
+}
+
+SHORT_OPTIONS="hb:B:cd:ef:ip:PqrsV:xh"
+LONG_OPTIONS="backup:,backup-subdirectory:,no-clear,no-compress,distro:,no-errfail,firewall:,init,pkg-manager:,skip-pkg-chk,run-quick,run-backup,skip-main,distro-version:,xtrace,help,version"
+OPTIONS=$(
+  getopt -o "$SHORT_OPTIONS" \
+    -l "$LONG_OPTIONS" \
+    -n "$0" -- "$@"
+)
+eval set -- "$OPTIONS"
+
+# Check for OPTIONS passed
+# TODO: Replace this with getopts, as well as use compgen, compopt, and complete
+while true; do
+  case "$1" in
+    -h | --help)
+      print_help
       exit 0
       ;;
     --version)
-      cat << EOF
-harden.sh ${SCRIPT_VERSION} from Security Scripts
-Copyright (C) 2025 - 2026 Michael Urbano
-Licensed under the BSD 3-Clause License
-See: https://opensource.org/licenses/BSD-3-Clause
-
-EOF
+      print_version
       exit 0
       ;;
     -b | --backup)
@@ -254,7 +271,7 @@ EOF
       ;;
     -d | --distro)
       ARG_DISTRO="${2:-unknown}"
-      shift 2 || printf "Error: DIST cannot be empty\n"; exit 1
+      shift 2 # || printf "Error: DIST cannot be empty\n"; exit 1
       ;;
     -e | --no-errfail)
       set +e
@@ -262,7 +279,7 @@ EOF
       ;;
     -f | --firewall)
       ARG_FW="${2:-unknown}"
-      shift 2 || printf "Error: FW cannot be empty\n"; exit 1
+      shift 2 # || printf "Error: FW cannot be empty\n"; exit 1
       ;;
     -i | --init)
       check_root
@@ -273,7 +290,7 @@ EOF
       ;;
     -p | --pkg-manager)
       ARG_PM="${2:-unknown}"
-      shift 2 || printf "Error: PM cannot be empty\n"; exit 1
+      shift 2 # || printf "Error: PM cannot be empty\n"; exit 1
       ;;
     -P | --skip-pkg-chk)
       SKIP_PKG_CHK="true"
@@ -293,11 +310,15 @@ EOF
       ;;
     -V | --distro-version)
       ARG_VER="${2:-unknown}"
-      shift 2 || printf "Error: VER cannot be empty\n"; exit 1
+      shift 2 # || printf "Error: VER cannot be empty\n"; exit 1
       ;;
     -x | --xtrace)
       set -x
       shift
+      ;;
+    --)
+      shift
+      break
       ;;
     *)
       printf "Usage: sudo %s [OPTIONS]...\n" "$0"
@@ -306,6 +327,7 @@ EOF
   esac
 done
 
+# Now that the options have been passed and checked, we can check for root
 check_root
 
 if [[ "$ARG_BACKUP" == "enabled" ]]; then
