@@ -79,6 +79,13 @@ check_ntp() {
   return 1
 }
 
+check_timezone() {
+  local localtime timezone
+  localtime=$(readlink /etc/localtime || echo "Unknown")
+  timezone=${localtime#*/zoneinfo/}
+  printf "%bCurrent Timezone:%b %b%s %b\n" "${GREEN}" "${NC}" "${YELLOW}" "${timezone}" "${NC}"
+}
+
 check_mac() {
   return 1
 }
@@ -164,6 +171,8 @@ init() {
     printf "%b%s%b " "$RED" "$firewall" "$NC"
   done
   printf "\n"
+
+  check_timezone
 
   print_status message info "Checking which services are enabled"
   # Check if commands are present, and/or if their services are enabled
