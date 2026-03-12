@@ -266,7 +266,7 @@ EOF
       ;;
     -i | --init)
       check_root
-      . ./lib/error.sh
+      . ./lib/status.sh
       . ./lib/initialization.sh
       init
       exit 0
@@ -309,7 +309,7 @@ done
 check_root
 
 if [[ "$ARG_BACKUP" == "enabled" ]]; then
-  . ./lib/error.sh
+  . ./lib/status.sh
   . ./lib/utility.sh
   backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
   || print_status unsuccessful_function error \
@@ -319,7 +319,7 @@ fi
 if [[ "$ARG_QUICK" == "enabled" ]]; then
   . ./lib/initialization.sh
   . ./lib/utility.sh
-  . ./lib/error.sh
+  . ./lib/status.sh
   . ./lib/kernel.sh
   . ./lib/permissions.sh
   init
@@ -343,7 +343,7 @@ fi
 . ./lib/initialization.sh
 . ./lib/utility.sh
 . ./lib/menu.sh
-. ./lib/error.sh
+. ./lib/status.sh
 . ./lib/firewall.sh
 . ./lib/kernel.sh
 . ./lib/logging.sh
