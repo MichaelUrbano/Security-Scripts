@@ -230,7 +230,7 @@ configure_firewall() {
   fw_add_rules() {
     local service="" protocol="" valid_port="false" valid_name="false" append="" rule=""
     while true; do
-      read -rp "Enter port/protocol or service name (q to exit): " service protocol
+      read -erp "Enter port/protocol or service name (q to exit): " service protocol
       # For verifying that given input is valid
       # Is input only numbers, then is it a valid port number, and finally
       # did they specify a valid protocol?
@@ -299,7 +299,7 @@ configure_firewall() {
         return 0
       fi
       fw_show_inbound
-      read -rp "Enter port & protocol to delete (q to exit): " service protocol
+      read -erp "Enter port & protocol to delete (q to exit): " service protocol
       if [[ "$service" = "q" ]]; then
         return 0
       fi
@@ -338,7 +338,7 @@ configure_firewall() {
       fw_show_outbound
       printf "%bq%b to exit\n" "${YELLOW}${BOLD}" "$NC"
       printf "%bip%b to toggle IP blocking\n" "${YELLOW}${BOLD}" "$NC"
-      read -rp "Enter service name to toggle (q to exit): " reply
+      read -erp "Enter service name to toggle (q to exit): " reply
       case "$reply" in
         q)
           return 0
@@ -440,7 +440,7 @@ configure_firewall() {
     fi
     printf "%bIs this information correct?%b\n" "$RED" "$NC"
     while true; do
-      read -rp "(y/n): " reply
+      read -erp "(y/n): " reply
       case $reply in
         y) 
           reply=""
@@ -481,7 +481,7 @@ configure_firewall() {
     fi
     printf "%bOnce more: is this information correct?%b\n" "${RED}${BOLD}" "$NC"
     while true; do
-      read -rp "(y/n): " reply
+      read -erp "(y/n): " reply
       case $reply in
         y)
           reply=""
@@ -694,7 +694,7 @@ configure_firewall() {
   print_status message_object warn firewall "Configuring" "$active_firewall"
   print_status message_object info command "Wrong firewall? Exit with" "q"
   while true; do
-    read -rp "fwconf> "
+    read -erp "$(print_prompt "/fwc")"
     case "$REPLY" in
       help | h)
         fw_help

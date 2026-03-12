@@ -43,6 +43,16 @@ readonly IC="${BLUE}${BOLD}"   # [INFO]
 readonly SC="${GREEN}${BOLD}"  # [SUCCESS]
 readonly UC="\033[1;4;43;31m"  # [UNKNOWN]
 
+# Set the pseudo-prompt for the script
+PSS="harden"
+PSE=">"
+PSC="${GREEN}${BOLD}"
+
+print_prompt() {
+  SUBPROMPT=${1:-""}
+  printf "%b%s%s%s%b" "${PSC}" "${PSS}" "$SUBPROMPT" "${PSE}" "${NC} "
+}
+
 # List of Linux Distributions IDs supported by the script
 declare -ar SUPPORTED_DISTROS=(
   "ubuntu"
@@ -406,7 +416,7 @@ main() {
   while true; do
     print_main_menu
     while true; do
-      read -rp "harden> "
+      read -erp "$(print_prompt)"
       case $REPLY in
         backup | b)
           backup_directories "$ARG_DIRECTORY" "$ARG_SUBDIRECTORY" \
@@ -440,7 +450,7 @@ main() {
           local option_two
           local remote_logging="journal_remote"
           while true; do
-            read -rp "Install systemd-journal-remote? (y/n): " \
+            read -erp "Install systemd-journal-remote? (y/n): " \
               option_one
             case $option_one in
               y)
@@ -457,7 +467,7 @@ main() {
 
           if [[ "$remote_logging" == "rsyslog" ]]; then
             while true; do
-              read -rp "Install rsyslog instead? (y/n): " \
+              read -erp "Install rsyslog instead? (y/n): " \
                 option_one
               case $option_one in
                 y)
@@ -474,7 +484,7 @@ main() {
           fi
 
           while true; do
-            read -rp "Install extra security packages? (y/n): " \
+            read -erp "Install extra security packages? (y/n): " \
               option_two
             case $option_two in
               y)
@@ -524,7 +534,7 @@ main() {
           local journal_remote="false"
           local rsyslog="false"
           while true; do
-            read -rp "Configure systemd-journal-remote? (y/n): " \
+            read -erp "Configure systemd-journal-remote? (y/n): " \
               option_one
             case $option_one in
               y)
@@ -541,7 +551,7 @@ main() {
 
           if [[ "$journal_remote" == "false" ]]; then
             while true; do
-              read -rp "Configure rsyslog for remote logging instead? (y/n): " \
+              read -erp "Configure rsyslog for remote logging instead? (y/n): " \
                 option_two
               case $option_two in
                 y)
@@ -593,7 +603,7 @@ main() {
         sys)
           local option_one
           while true; do
-            read -rp "Disable IPv6? (y/n): " option_one
+            read -erp "Disable IPv6? (y/n): " option_one
             case $option_one in
               y)
                 option_one="true" && break
@@ -614,7 +624,7 @@ main() {
           jclr
           init
           override
-          read -rp "Press enter to continue "
+          read -erp "Press enter to continue "
           ;;
         quit | q) 
           exit 0
