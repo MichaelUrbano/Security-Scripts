@@ -15,14 +15,24 @@ services:
     privileged: true
     cap_add:
       - NET_ADMIN
-    # Not strictly necessary, can remove these two lines if desired
+    # Not strictly necessary when doing automated tests, but necessary when doing manual tests
     stdin_open: true
     tty: true
+    # You will want to put your service under the "all" and "custom" profiles, so that they can be started with
+    # docker compose -f tests/Linux/harden/docker/compose/compose.yml --profile <name> up -d
+    profiles:
+      - "all"
+      - "example"
+    # Section below can be uncommented to run automated tests, either by the tests defined in .env, or
+    # tests you choose yourself.
+    # command: >
+    #   bash -c "${TESTS}"
+
   debian:
     build:
       context: ../../../../../
       dockerfile: tests/Linux/harden/docker/Dockerfile/debian.Dockerfile
-    container_name: security-scripts-testing-debian-latest
+    container_name: security-scripts-testing-manual-debian
     privileged: true
     cap_add:
       - NET_ADMIN
@@ -33,29 +43,18 @@ services:
     build:
       context: ../../../../../
       dockerfile: tests/Linux/harden/docker/Dockerfile/ubuntu.Dockerfile
-    container_name: security-scripts-testing-ubuntu-latest
+    container_name: security-scripts-testing-manual-ubuntu
     privileged: true
     cap_add:
       - NET_ADMIN
     stdin_open: true
     tty: true
 
-  oraclelinux-9:
-    build:
-      context: ../../../../../
-      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-9.Dockerfile
-    container_name: security-scripts-testing-oraclelinux-9
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-    stdin_open: true
-    tty: true
-
-  oraclelinux-10:
+  oraclelinux:
     build:
       context: ../../../../../
       dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-10.Dockerfile
-    container_name: security-scripts-testing-oraclelinux-10
+    container_name: security-scripts-testing-manual-oraclelinux
     privileged: true
     cap_add:
       - NET_ADMIN
@@ -66,7 +65,7 @@ services:
     build:
       context: ../../../../../
       dockerfile: tests/Linux/harden/docker/Dockerfile/fedora.Dockerfile
-    container_name: security-scripts-testing-fedora-latest
+    container_name: security-scripts-testing-manual-fedora
     privileged: true
     cap_add:
       - NET_ADMIN
@@ -77,7 +76,7 @@ services:
     build:
       context: ../../../../../
       dockerfile: tests/Linux/harden/docker/Dockerfile/opensuse-leap.Dockerfile
-    container_name: security-scripts-testing-opensuse-leap-latest
+    container_name: security-scripts-testing-manual-opensuse-leap
     privileged: true
     cap_add:
       - NET_ADMIN

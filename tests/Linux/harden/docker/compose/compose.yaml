@@ -1,5 +1,13 @@
 # For automated local tests, this builds Dockerfiles, and runs bats tests as defined in the environment variable TESTS, defined in .env
-services:
+# View compose.yaml to see an example service
+# Containers can be started with a specific profile with docker compose --profile <name> up -d
+# Each profile has sets of containers that each follow some kind of purpose, or release date
+  # "all": Will start all containers within the compose file (not recommended)
+  # "latest": Starts containers which use the "latest" tag (with oraclelinux being the exception, given it doesn't have a latest tag)
+  # "stable": Similar to "latest", just that it will instead pull the containers by their latest version number, rather than with the latest tag
+  # "LTS": Starts containers that still receive security or maintenance support, but no feature updates
+  # "EOL": Starts containers which have reached "End-Of-Life", and receive no maintenance whatsoever
+services:  
   debian:
     build:
       context: ../../../../../
@@ -10,6 +18,9 @@ services:
       - NET_ADMIN
     stdin_open: true
     tty: true
+    profiles:
+      - "all"
+      - "latest"
     command: >
       bash -c "${TESTS}"
 
@@ -23,19 +34,9 @@ services:
       - NET_ADMIN
     stdin_open: true
     tty: true
-    command: >
-      bash -c "${TESTS}"
-
-  oraclelinux-9:
-    build:
-      context: ../../../../../
-      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-9.Dockerfile
-    container_name: security-scripts-testing-oraclelinux-9
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-    stdin_open: true
-    tty: true
+    profiles:
+      - "all"
+      - "latest"
     command: >
       bash -c "${TESTS}"
 
@@ -49,6 +50,10 @@ services:
       - NET_ADMIN
     stdin_open: true
     tty: true
+    profiles:
+      - "all"
+      - "latest"
+      - "stable"
     command: >
       bash -c "${TESTS}"
 
@@ -62,6 +67,9 @@ services:
       - NET_ADMIN
     stdin_open: true
     tty: true
+    profiles:
+      - "all"
+      - "latest"
     command: >
       bash -c "${TESTS}"
 
@@ -75,5 +83,168 @@ services:
       - NET_ADMIN
     stdin_open: true
     tty: true
+    profiles:
+      - "all"
+      - "latest"
+    command: >
+      bash -c "${TESTS}"
+
+  debian-12:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/debian-12.Dockerfile
+    container_name: security-scripts-testing-debian-12
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  debian-11:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/debian-11.Dockerfile
+    container_name: security-scripts-testing-debian-11
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  ubuntu-22.04:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/ubuntu-22.04.Dockerfile
+    container_name: security-scripts-testing-ubuntu-22.04
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  oraclelinux-9:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-9.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-9
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  oraclelinux-8:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/oraclelinux-8.Dockerfile
+    container_name: security-scripts-testing-oraclelinux-8
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  fedora-42:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/fedora-42.Dockerfile
+    container_name: security-scripts-testing-fedora-42
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "LTS"
+    command: >
+      bash -c "${TESTS}"
+
+  debian-13:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/debian-13.Dockerfile
+    container_name: security-scripts-testing-debian-13
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "stable"
+    command: >
+      bash -c "${TESTS}"
+
+  ubuntu-24.04:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/ubuntu-24.04.Dockerfile
+    container_name: security-scripts-testing-ubuntu-24.04
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "stable"
+    command: >
+      bash -c "${TESTS}"
+
+  fedora-43:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/fedora-43.Dockerfile
+    container_name: security-scripts-testing-fedora-43
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "stable"
+    command: >
+      bash -c "${TESTS}"
+
+  opensuse-leap-15:
+    build:
+      context: ../../../../../
+      dockerfile: tests/Linux/harden/docker/Dockerfile/opensuse-leap-15.Dockerfile
+    container_name: security-scripts-testing-opensuse-leap-15
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    stdin_open: true
+    tty: true
+    profiles:
+      - "all"
+      - "stable"
     command: >
       bash -c "${TESTS}"
