@@ -42,7 +42,9 @@ generate_menu_options() {
       <<<"${_UN_GENERATE_MENU_OPTIONS["${root_section}:PRINT_ORDER"]}"
     for option in "${options[@]}"; do
       if [[ -z "${_UN_GENERATE_MENU_OPTIONS["${root_section}:${option}"]:-}" ]]; then
-        continue # TODO: make this NOT silently fail
+        print_status message warn \
+          "Menu option definition missing for ${root_section}:${option}"
+        continue
       fi
       short_option="${_UN_GENERATE_MENU_OPTIONS["${root_section}:${option}"]%%:*}"
       description="${_UN_GENERATE_MENU_OPTIONS["${root_section}:${option}"]##*:}"
