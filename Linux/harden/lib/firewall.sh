@@ -249,10 +249,10 @@ configure_firewall() {
         local attempted_service=""
         # Does the input service exist in the service_ports array?
         for service_name in "${service_ports[@]}"; do
-          attempted_service=$(echo "$service_name" | cut -d ":" -f 1)
+          attempted_service="${service_name%%:*}"
           if [[ "$attempted_service" = "$service" ]]; then
             valid_name="true"
-            append=$(echo "$service_name" | cut -d ":" -f 2)
+            append="${service_name#*:}"
           fi
         done
       elif [[ "$service" = "q" ]]; then # did they type q to exit?
@@ -353,7 +353,7 @@ configure_firewall() {
         *)
           # TODO: excessive nesting, needs to be cleaned
           for outbound_service in "${!outbound_rulelist[@]}"; do
-            service_name=$(echo "$outbound_service" | cut -d ":" -f 1)
+            service_name="${outbound_service%%:*}"
             if [[ "$service_name" == "$reply" ]]; then
               if [[ "${outbound_rulelist[$outbound_service]}" == "DROP" ]]; then
                 outbound_rulelist[$outbound_service]="ALLOW"
@@ -518,9 +518,9 @@ configure_firewall() {
         firewall-cmd --zone=hardened --permanent \
           --add-rich-rule='rule family=ipv6 direction="out" drop'
         for outbound_service in "${!outbound_rulelist[@]}"; do
-          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
-          port=$(echo "$port_prot" | cut -d "/" -f 1)
-          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          port_prot="${outbound_service#*:}"
+          port="${port_prot%/*}"
+          protocol="${port_prot#*/}"
           if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
             firewall-cmd --zone=hardened --permanent \
               --add-rich-rule="rule family=ipv4 direction='out' port port='$port' protocol='$protocol' accept"
@@ -529,8 +529,8 @@ configure_firewall() {
           fi
         done
         for rule in "${rulelist[@]}"; do
-          port=$(echo "$rule" | cut -d "/" -f 1)
-          protocol=$(echo "$rule" | cut -d "/" -f 2)
+          port="${rule%/*}"
+          protocol="${rule#*/}"
           firewall-cmd --add-port="${port}/${protocol}"
         done
         for interface in "${interfaces[@]}"; do
@@ -549,12 +549,12 @@ configure_firewall() {
         print_status message info "Backing up configuration..."
         backup_firewall ufw finalize
         for rule in "${rulelist[@]}"; do
-          port=$(echo "$rule" | cut -d "/" -f 1)
-          protocol=$(echo "$rule" | cut -d "/" -f 2)
+          port="${rule%/*}"
+          protocol="${rule#*/}"
           ufw allow in "${port}/${protocol}"
         done
         for outbound_service in "${!outbound_rulelist[@]}"; do
-          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
+          port_prot="${outbound_service#*:}"
           if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
             ufw allow out "$port_prot"
           fi
@@ -586,14 +586,14 @@ configure_firewall() {
         print_status message info "Backing up configuration..."
         backup_firewall nftables finalize
         for rule in "${rulelist[@]}"; do
-          port=$(echo "$rule" | cut -d "/" -f 1)
-          protocol=$(echo "$rule" | cut -d "/" -f 2)
+          port="${rule%/*}"
+          protocol="${rule#*/}"
           nft add rule inet filter INPUT "$protocol" dport "$port" accept
         done
         for outbound_service in "${!outbound_rulelist[@]}"; do
-          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
-          port=$(echo "$port_prot" | cut -d "/" -f 1)
-          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          port_prot="${outbound_service#*:}"
+          port="${port_prot%/*}"
+          protocol="${port_prot#*/}"
           if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
             nft add rule inet filter OUTPUT "$protocol" dport "$port" accept
           fi
@@ -628,15 +628,15 @@ configure_firewall() {
         print_status message info "Backing up configuration..."
         backup_firewall iptables finalize
         for rule in "${rulelist[@]}"; do
-          port=$(echo "$rule" | cut -d "/" -f 1)
-          protocol=$(echo "$rule" | cut -d "/" -f 2)
+          port="${rule%/*}"
+          protocol="${rule#*/}"
           iptables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
           ip6tables -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
         done
         for outbound_service in "${!outbound_rulelist[@]}"; do
-          port_prot=$(echo "$outbound_service" | cut -d ":" -f 2)
-          port=$(echo "$port_prot" | cut -d "/" -f 1)
-          protocol=$(echo "$port_prot" | cut -d "/" -f 2)
+          port_prot="${outbound_service#*:}"
+          port="${port_prot%/*}"
+          protocol="${port_prot#*/}"
           if [[ "${outbound_rulelist[$outbound_service]}" == "ALLOW" ]]; then
             iptables -A OUTPUT -p "$protocol" --dport "$port" -j ACCEPT
             ip6tables -A OUTPUT -p "$protocol" --dport "$port" -j ACCEPT
